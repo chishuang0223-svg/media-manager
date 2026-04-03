@@ -1987,7 +1987,6 @@
 
             // 计算统计数据
             const totalCost = activityResources.reduce((sum, r) => sum + r.singleCost, 0);
-            const mediaTypes = [...new Set(activityResources.map(r => r.mediaType))].join(', ');
 
             // 获取标签信息
             const tagInfo = tagInfoMap[activityName] || {};
@@ -1997,7 +1996,6 @@
             document.getElementById('activityDetailName').textContent = activityName;
             document.getElementById('detailResourceCount').textContent = activityResources.length;
             document.getElementById('detailTotalCost').textContent = '¥' + totalCost.toLocaleString();
-            document.getElementById('detailMediaTypes').textContent = mediaTypes;
 
             // 更新传播汇报链接
             const reportLinkElement = document.getElementById('detailReportLink');
