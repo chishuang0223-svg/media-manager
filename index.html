@@ -1,0 +1,3179 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>媒体资源管理系统</title>
+    <!-- SheetJS库用于Excel导出 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #546e7a 0%, #37474f 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #546e7a 0%, #37474f 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+            position: relative;
+        }
+
+        .header h1 {
+            font-size: 32px;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .sync-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 14px;
+            padding: 5px 12px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 20px;
+            font-weight: normal;
+        }
+
+        .sync-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #4caf50;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 16px;
+        }
+
+        .back-btn {
+            position: absolute;
+            left: 30px;
+            top: 50%;
+            transform: translateY(-50%);
+            padding: 10px 20px;
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: 2px solid white;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+            display: none;
+        }
+
+        .back-btn:hover {
+            background: white;
+            color: #546e7a;
+        }
+
+        .stats-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            padding: 30px;
+            background: #f8f9fa;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .stat-card h3 {
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .stat-card .value {
+            font-size: 32px;
+            font-weight: bold;
+            color: #546e7a;
+        }
+
+        .stat-card .label {
+            color: #999;
+            font-size: 12px;
+            margin-top: 5px;
+        }
+
+        .toolbar {
+            padding: 20px 30px;
+            background: white;
+            border-bottom: 1px solid #e0e0e0;
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .search-box {
+            flex: 1;
+            min-width: 250px;
+            position: relative;
+        }
+
+        .search-box input {
+            width: 100%;
+            padding: 12px 40px 12px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        .search-box input:focus {
+            outline: none;
+            border-color: #546e7a;
+        }
+
+        .search-box::after {
+            content: '🔍';
+            position: absolute;
+            right: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+
+        .filter-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .filter-section {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .filter-section-label {
+            font-size: 12px;
+            color: #666;
+            font-weight: 600;
+        }
+
+        .filter-btn {
+            padding: 10px 20px;
+            border: 2px solid #546e7a;
+            background: white;
+            color: #546e7a;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+
+        .filter-btn:hover {
+            background: #546e7a;
+            color: white;
+        }
+
+        .filter-btn.active {
+            background: #546e7a;
+            color: white;
+        }
+
+        .add-btn, .export-btn {
+            padding: 12px 25px;
+            background: linear-gradient(135deg, #546e7a 0%, #37474f 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+            transition: transform 0.2s;
+        }
+
+        .export-btn {
+            background: linear-gradient(135deg, #7cb342 0%, #558b2f 100%);
+        }
+
+        /* 标签汇总按钮特殊样式 - 超级醒目（静态） */
+        .summary-btn {
+            background: linear-gradient(135deg, #ff6b35 0%, #f7931e 100%) !important;
+            font-size: 20px !important;
+            padding: 18px 45px !important;
+            box-shadow: 0 8px 30px rgba(255, 107, 53, 0.7);
+            font-weight: 900 !important;
+            position: relative;
+            margin-right: 20px !important;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+        }
+
+        .summary-btn:hover {
+            transform: translateY(-3px) !important;
+            box-shadow: 0 10px 35px rgba(255, 107, 53, 0.8);
+        }
+
+        .add-btn:hover, .export-btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .table-container {
+            padding: 30px;
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+        }
+
+        thead {
+            background: #f8f9fa;
+        }
+
+        th {
+            padding: 15px;
+            text-align: left;
+            font-weight: 600;
+            color: #333;
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 2px solid #e0e0e0;
+            white-space: nowrap;
+        }
+
+        td {
+            padding: 15px;
+            border-bottom: 1px solid #f0f0f0;
+            color: #555;
+            font-size: 14px;
+            white-space: nowrap;
+        }
+
+        /* 列宽优化 - 固定窄列 */
+        td:nth-child(1) { /* 序号 */
+            width: 50px;
+            text-align: center;
+        }
+
+        td:nth-child(10) { /* 使用频次/剩余 */
+            width: 100px;
+            text-align: center;
+        }
+
+        td:nth-child(5), td:nth-child(13) { /* 原创/供稿、主持人 */
+            width: 80px;
+            text-align: center;
+        }
+
+        td:nth-child(14) { /* 操作 */
+            width: 120px;
+            text-align: center;
+        }
+
+        /* 列宽优化 - 中等宽度列，支持换行 */
+        td:nth-child(2), td:nth-child(6) { /* 媒体类型、内容类型 */
+            width: 100px;
+            min-width: 100px;
+            white-space: normal;
+            word-wrap: break-word;
+            word-break: keep-all;
+        }
+
+        td:nth-child(3) { /* 媒体名称 */
+            width: 140px;
+            white-space: normal;
+            word-wrap: break-word;
+        }
+
+        td:nth-child(4) { /* 代理公司 */
+            width: 110px;
+            white-space: normal;
+            word-wrap: break-word;
+        }
+
+        td:nth-child(7) { /* 发布平台 */
+            width: 110px;
+            white-space: normal;
+            word-wrap: break-word;
+        }
+
+        td:nth-child(9) { /* 活动标签 */
+            min-width: 150px;
+            max-width: 450px;
+            white-space: normal;
+            word-wrap: break-word;
+        }
+
+        .tags-cell {
+            min-width: 150px !important;
+            max-width: 450px !important;
+            width: auto !important;
+        }
+
+        td:nth-child(11), td:nth-child(12) { /* 单次费用、剩余费用 */
+            width: 110px;
+            text-align: right;
+        }
+
+        /* 列宽优化 - 详细资源列（最宽，支持换行） */
+        td:nth-child(8) { /* 详细资源 */
+            width: 400px;
+            max-width: 400px;
+            white-space: normal;
+            word-wrap: break-word;
+            word-break: keep-all;
+            overflow: hidden;
+        }
+
+        /* 活动详情页面表格列宽优化 */
+        #activityDetailTable td:nth-child(1) { /* 序号 */
+            width: 50px;
+            text-align: center;
+        }
+
+        #activityDetailTable td:nth-child(2), #activityDetailTable td:nth-child(6) { /* 媒体类型、内容类型 */
+            width: 100px;
+            min-width: 100px;
+            white-space: normal;
+            word-wrap: break-word;
+            word-break: keep-all;
+        }
+
+        #activityDetailTable td:nth-child(3) { /* 媒体名称 */
+            width: 140px;
+            white-space: normal;
+            word-wrap: break-word;
+        }
+
+        #activityDetailTable td:nth-child(4) { /* 代理公司 */
+            width: 110px;
+            white-space: normal;
+            word-wrap: break-word;
+        }
+
+        #activityDetailTable td:nth-child(5), #activityDetailTable td:nth-child(10) { /* 原创/供稿、主持人 */
+            width: 80px;
+            text-align: center;
+        }
+
+        #activityDetailTable td:nth-child(7) { /* 发布平台 */
+            width: 110px;
+            white-space: normal;
+            word-wrap: break-word;
+        }
+
+        #activityDetailTable td:nth-child(8) { /* 详细资源 */
+            width: 450px;
+            max-width: 450px;
+            white-space: normal;
+            word-wrap: break-word;
+            word-break: keep-all;
+            overflow: hidden;
+        }
+
+        #activityDetailTable td:nth-child(9) { /* 单次费用 */
+            width: 110px;
+            text-align: right;
+        }
+
+        /* 标签汇总页面表格列宽优化 */
+        #tagSummaryTable td:nth-child(1) { /* 序号 */
+            width: 50px;
+            text-align: center;
+        }
+
+        #tagSummaryTable td:nth-child(2) { /* 项目名称（标签） */
+            width: 200px;
+            white-space: normal;
+            word-wrap: break-word;
+            font-weight: 600;
+        }
+
+        #tagSummaryTable td:nth-child(3), #tagSummaryTable td:nth-child(4) { /* 总费用、媒体总家数 */
+            width: 120px;
+            text-align: center;
+        }
+
+        #tagSummaryTable td:nth-child(5), #tagSummaryTable td:nth-child(6) { /* 传播方向、使用时间 */
+            width: 150px;
+            white-space: normal;
+            word-wrap: break-word;
+        }
+
+        #tagSummaryTable td:nth-child(7) { /* 备注 */
+            width: 250px;
+            white-space: normal;
+            word-wrap: break-word;
+        }
+
+        #tagSummaryTable td:nth-child(8) { /* 操作 */
+            width: 200px;
+            text-align: center;
+        }
+
+        tr:hover {
+            background: #f8f9fa;
+        }
+
+        tr.used-up {
+            opacity: 0.5;
+            background: #f5f5f5;
+        }
+
+        tr.used-up td {
+            color: #999;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .badge-type {
+            background: #e3f2fd;
+            color: #1976d2;
+        }
+
+        .badge-platform {
+            background: #f3e5f5;
+            color: #7b1fa2;
+        }
+
+        .badge-content {
+            background: #fff3e0;
+            color: #f57c00;
+        }
+
+        .badge-agency {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+
+        .frequency-selector {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 5px 10px;
+            background: #f0f0f0;
+            border-radius: 8px;
+        }
+
+        .frequency-selector button {
+            width: 28px;
+            height: 28px;
+            border: none;
+            background: #546e7a;
+            color: white;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background 0.2s;
+        }
+
+        .frequency-selector button:hover {
+            background: #5568d3;
+        }
+
+        .frequency-selector button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .frequency-selector span {
+            min-width: 30px;
+            text-align: center;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .remaining-count {
+            font-weight: bold;
+            color: #4caf50;
+        }
+
+        .remaining-count.zero {
+            color: #f44336;
+        }
+
+        /* 活动标签样式 - 多彩版本 */
+        .activity-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            margin-top: 8px;
+        }
+
+        .activity-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 4px 10px;
+            color: white;
+            border-radius: 15px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .activity-tag:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        }
+
+        .activity-tag .remove-tag {
+            cursor: pointer;
+            font-weight: bold;
+            padding: 0 3px;
+        }
+
+        .activity-tag .remove-tag:hover {
+            color: #ffeb3b;
+        }
+
+        .add-tag-btn {
+            padding: 8px 20px;
+            background: linear-gradient(135deg, #ff6b35 0%, #f7931e 100%);
+            color: white;
+            border: none;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.2s;
+            box-shadow: 0 2px 8px rgba(255, 107, 53, 0.3);
+        }
+
+        .add-tag-btn:hover {
+            background: linear-gradient(135deg, #ff7b45 0%, #f9a02e 100%);
+            box-shadow: 0 4px 12px rgba(255, 107, 53, 0.4);
+            transform: translateY(-1px);
+        }
+
+        .add-tag-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .btn-edit, .btn-delete {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.2s;
+        }
+
+        .btn-edit {
+            background: #4caf50;
+            color: white;
+        }
+
+        .btn-edit:hover {
+            background: #45a049;
+        }
+
+        .btn-delete {
+            background: #f44336;
+            color: white;
+        }
+
+        .btn-delete:hover {
+            background: #da190b;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            animation: fadeIn 0.3s;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .modal-content {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            width: 90%;
+            max-width: 600px;
+            max-height: 90vh;
+            overflow-y: auto;
+            animation: slideUp 0.3s;
+        }
+
+        @keyframes slideUp {
+            from {
+                transform: translate(-50%, -40%);
+                opacity: 0;
+            }
+            to {
+                transform: translate(-50%, -50%);
+                opacity: 1;
+            }
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 25px;
+        }
+
+        .modal-header h2 {
+            color: #333;
+            font-size: 24px;
+        }
+
+        .close-btn {
+            font-size: 28px;
+            color: #999;
+            cursor: pointer;
+            border: none;
+            background: none;
+            transition: color 0.2s;
+        }
+
+        .close-btn:hover {
+            color: #333;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: 500;
+            font-size: 14px;
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #546e7a;
+        }
+
+        .form-group textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        .form-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+            margin-top: 25px;
+        }
+
+        .btn-cancel, .btn-save {
+            padding: 12px 30px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+            transition: all 0.2s;
+        }
+
+        .btn-cancel {
+            background: #e0e0e0;
+            color: #666;
+        }
+
+        .btn-cancel:hover {
+            background: #d0d0d0;
+        }
+
+        .btn-save {
+            background: linear-gradient(135deg, #546e7a 0%, #37474f 100%);
+            color: white;
+        }
+
+        .btn-save:hover {
+            transform: translateY(-2px);
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #999;
+        }
+
+        .empty-state h3 {
+            font-size: 20px;
+            margin-bottom: 10px;
+        }
+
+        /* 活动详情页面样式 */
+        .activity-detail {
+            display: none;
+        }
+
+        .activity-detail.active {
+            display: block;
+        }
+
+        .detail-header {
+            padding: 30px;
+            background: white;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .detail-header h2 {
+            font-size: 28px;
+            color: #333;
+            margin-bottom: 20px;
+        }
+
+        .detail-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .detail-stat-item {
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 10px;
+        }
+
+        .detail-stat-item .label {
+            color: #666;
+            font-size: 12px;
+            margin-bottom: 5px;
+        }
+
+        .detail-stat-item .value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #546e7a;
+        }
+
+        .price {
+            font-weight: bold;
+            color: #546e7a;
+        }
+
+        .usage-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
+
+        .usage-bar {
+            width: 60px;
+            height: 6px;
+            background: #e0e0e0;
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .usage-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #546e7a, #37474f);
+            transition: width 0.3s;
+        }
+
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 24px;
+            }
+
+            .toolbar {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .search-box {
+                min-width: 100%;
+            }
+
+            table {
+                font-size: 12px;
+            }
+
+            th, td {
+                padding: 10px 8px;
+            }
+
+            .stat-card .value {
+                font-size: 24px;
+            }
+
+            .modal-content {
+                width: 95%;
+                padding: 20px;
+            }
+
+            .back-btn {
+                left: 10px;
+                padding: 8px 15px;
+                font-size: 12px;
+            }
+        }
+
+        /* 登录页面样式 */
+        .login-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #546e7a 0%, #37474f 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+        }
+
+        .login-box {
+            background: white;
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            text-align: center;
+            min-width: 350px;
+        }
+
+        .login-box h1 {
+            color: #546e7a;
+            margin-bottom: 10px;
+        }
+
+        .login-box p {
+            color: #666;
+            margin-bottom: 20px;
+        }
+
+        .login-box input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+            margin-bottom: 15px;
+            box-sizing: border-box;
+        }
+
+        .login-box button {
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(135deg, #546e7a 0%, #37474f 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+
+        .login-box button:hover {
+            opacity: 0.9;
+        }
+    </style>
+</head>
+<body>
+    <!-- 登录页面 -->
+    <div id="loginContainer" class="login-container">
+        <div class="login-box">
+            <h1>🔐 媒体资源管理系统</h1>
+            <p>请输入访问密码</p>
+            <input type="password" id="passwordInput" placeholder="请输入密码" onkeypress="if(event.key==='Enter') document.getElementById('loginBtn').click()">
+            <button id="loginBtn">登录</button>
+            <p id="loginError" style="display:none; color: red; margin-top: 10px;">密码错误，请重试</p>
+        </div>
+    </div>
+
+    <!-- 主系统内容 -->
+    <div id="mainContent" style="display: none;">
+    <!-- 主列表页面 -->
+    <div id="mainView" class="container">
+        <div class="header">
+            <h1>
+                📊 媒体资源管理系统
+                <span id="syncIndicator" class="sync-indicator" style="display: none;">
+                    <span class="sync-dot"></span>
+                    实时同步
+                </span>
+            </h1>
+            <p>智能管理您的媒体资源，跟踪活动标签</p>
+        </div>
+
+        <div class="stats-container">
+            <div class="stat-card">
+                <h3>总资源数</h3>
+                <div class="value" id="totalResources">0</div>
+                <div class="label">个资源</div>
+            </div>
+            <div class="stat-card">
+                <h3>可用资源</h3>
+                <div class="value" style="color: #4caf50" id="availableResources">0</div>
+                <div class="label">剩余可用</div>
+            </div>
+            <div class="stat-card">
+                <h3>已用完资源</h3>
+                <div class="value" style="color: #f44336" id="usedUpResources">0</div>
+                <div class="label">已使用完毕</div>
+            </div>
+            <div class="stat-card">
+                <h3>剩余总频次</h3>
+                <div class="value" style="color: #ff9800" id="remainingFrequency">0</div>
+                <div class="label">可用次数</div>
+            </div>
+        </div>
+
+        <div class="toolbar">
+            <div class="search-box">
+                <input type="text" id="searchInput" placeholder="搜索媒体名称、类型、平台、代理公司...">
+            </div>
+            <div class="filter-group">
+                <div class="filter-section">
+                    <span class="filter-section-label">资源状态</span>
+                    <div style="display: flex; gap: 10px;">
+                        <button class="filter-btn active" data-filter="all" data-type="status">全部</button>
+                        <button class="filter-btn" data-filter="available" data-type="status">可用资源</button>
+                        <button class="filter-btn" data-filter="used-up" data-type="status">已用完</button>
+                    </div>
+                </div>
+                <div class="filter-section">
+                    <span class="filter-section-label">内容类型</span>
+                    <div style="display: flex; gap: 10px;">
+                        <button class="filter-btn" data-filter="图文" data-type="content">图文</button>
+                        <button class="filter-btn" data-filter="视频" data-type="content">视频</button>
+                        <button class="filter-btn" data-filter="原创" data-type="content">原创</button>
+                        <button class="filter-btn" data-filter="供稿" data-type="content">供稿</button>
+                    </div>
+                </div>
+            </div>
+            <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+                <button class="export-btn summary-btn" onclick="openTagSummaryPage()">📊 标签汇总</button>
+                <div style="flex: 1; min-width: 10px;"></div>
+                <button class="add-btn" onclick="openAddModal()">+ 添加资源</button>
+                <button class="export-btn" onclick="exportData()" style="background: linear-gradient(135deg, #7cb342 0%, #558b2f 100%);">💾 导出备份</button>
+                <button class="export-btn" onclick="document.getElementById('importFile').click()" style="background: linear-gradient(135deg, #42a5f5 0%, #1e88e5 100%);">📥 导入备份</button>
+                <button class="export-btn" onclick="document.getElementById('batchImportFile').click()" style="background: linear-gradient(135deg, #ef5350 0%, #e53935 100%);">📋 批量导入</button>
+            </div>
+            <input type="file" id="importFile" accept=".json" style="display: none;" onchange="importData(event)">
+            <input type="file" id="batchImportFile" accept=".json,.csv,.xlsx,.xls" style="display: none;" onchange="batchImportData(event)">
+        </div>
+
+        <div class="table-container">
+            <table id="resourceTable">
+                <thead>
+                    <tr>
+                        <th>序号</th>
+                        <th style="cursor: pointer; position: relative;" onclick="toggleMediaTypeFilter(event)">
+                            媒体类型 <span style="font-size: 12px;">▼</span>
+                            <div id="mediaTypeFilterDropdown" style="display: none; position: absolute; top: 100%; left: 0; background: white; border: 1px solid #ddd; border-radius: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); padding: 10px; min-width: 200px; z-index: 1000; max-height: 300px; overflow-y: auto;">
+                                <!-- 媒体类型筛选选项 -->
+                            </div>
+                        </th>
+                        <th>媒体名称</th>
+                        <th>代理公司</th>
+                        <th>原创/供稿</th>
+                        <th style="cursor: pointer; position: relative;" onclick="toggleContentTypeFilter(event)">
+                            内容类型 <span style="font-size: 12px;">▼</span>
+                            <div id="contentTypeFilterDropdown" style="display: none; position: absolute; top: 100%; left: 0; background: white; border: 1px solid #ddd; border-radius: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); padding: 10px; min-width: 200px; z-index: 1000; max-height: 300px; overflow-y: auto;">
+                                <!-- 内容类型筛选选项 -->
+                            </div>
+                        </th>
+                        <th style="cursor: pointer; position: relative;" onclick="togglePlatformFilter(event)">
+                            发布平台 <span style="font-size: 12px;">▼</span>
+                            <div id="platformFilterDropdown" style="display: none; position: absolute; top: 100%; left: 0; background: white; border: 1px solid #ddd; border-radius: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); padding: 10px; min-width: 200px; z-index: 1000; max-height: 300px; overflow-y: auto;">
+                                <!-- 发布平台筛选选项 -->
+                            </div>
+                        </th>
+                        <th>详细资源</th>
+                        <th style="cursor: pointer; position: relative;" onclick="toggleTagFilter(event)">
+                            活动标签 <span style="font-size: 12px;">▼</span>
+                            <div id="tagFilterDropdown" style="display: none; position: absolute; top: 100%; left: 0; background: white; border: 1px solid #ddd; border-radius: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); padding: 10px; min-width: 200px; z-index: 1000; max-height: 300px; overflow-y: auto;">
+                                <!-- 标签筛选选项 -->
+                            </div>
+                        </th>
+                        <th>使用频次/剩余</th>
+                        <th>单次费用</th>
+                        <th>剩余费用</th>
+                        <th style="cursor: pointer; position: relative;" onclick="toggleHostFilter(event)">
+                            主持人 <span style="font-size: 12px;">▼</span>
+                            <div id="hostFilterDropdown" style="display: none; position: absolute; top: 100%; left: 0; background: white; border: 1px solid #ddd; border-radius: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); padding: 10px; min-width: 150px; z-index: 1000; max-height: 300px; overflow-y: auto;">
+                                <!-- 主持人筛选选项 -->
+                            </div>
+                        </th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody id="tableBody">
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- 标签汇总页面 -->
+    <div id="tagSummaryView" class="container activity-detail">
+        <div class="header">
+            <button class="back-btn" onclick="backToMainFromSummary()" style="display: block;">← 返回列表</button>
+            <h1>📊 活动标签汇总</h1>
+            <p>按标签分类汇总的项目信息</p>
+        </div>
+
+        <!-- 搜索框 -->
+        <div class="controls" style="padding: 20px 30px; background: white; border-bottom: 1px solid #e0e0e0;">
+            <div class="search-box">
+                <input
+                    type="text"
+                    id="summarySearchInput"
+                    placeholder="🔍 搜索项目名称、传播方向、使用时间..."
+                    oninput="handleSummarySearch(this.value)"
+                    style="width: 100%; padding: 12px 20px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px; transition: all 0.3s;"
+                    onfocus="this.style.borderColor='#546e7a'"
+                    onblur="this.style.borderColor='#e0e0e0'"
+                >
+            </div>
+        </div>
+
+        <div class="table-container">
+            <table id="tagSummaryTable">
+                <thead>
+                    <tr>
+                        <th>序号</th>
+                        <th style="cursor: pointer; position: relative;" onclick="toggleSummaryTagNameFilter(event)">
+                            项目名称（标签） <span style="font-size: 12px;">▼</span>
+                            <div id="summaryTagNameFilterDropdown" style="display: none; position: absolute; top: 100%; left: 0; background: white; border: 1px solid #ddd; border-radius: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); padding: 10px; min-width: 200px; z-index: 1000; max-height: 300px; overflow-y: auto;">
+                                <!-- 项目名称筛选选项 -->
+                            </div>
+                        </th>
+                        <th>总费用</th>
+                        <th>媒体总家数</th>
+                        <th style="cursor: pointer; position: relative;" onclick="toggleSummaryDirectionFilter(event)">
+                            传播方向 <span style="font-size: 12px;">▼</span>
+                            <div id="summaryDirectionFilterDropdown" style="display: none; position: absolute; top: 100%; left: 0; background: white; border: 1px solid #ddd; border-radius: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); padding: 10px; min-width: 200px; z-index: 1000; max-height: 300px; overflow-y: auto;">
+                                <!-- 传播方向筛选选项 -->
+                            </div>
+                        </th>
+                        <th style="cursor: pointer; position: relative;" onclick="toggleSummaryTimeFilter(event)">
+                            使用时间 <span style="font-size: 12px;">▼</span>
+                            <div id="summaryTimeFilterDropdown" style="display: none; position: absolute; top: 100%; left: 0; background: white; border: 1px solid #ddd; border-radius: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); padding: 10px; min-width: 200px; z-index: 1000; max-height: 300px; overflow-y: auto;">
+                                <!-- 使用时间筛选选项 -->
+                            </div>
+                        </th>
+                        <th>备注</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody id="tagSummaryBody">
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- 编辑标签信息模态框 -->
+    <div id="editTagInfoModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>编辑标签信息</h2>
+                <button class="close-btn" onclick="closeEditTagInfoModal()">&times;</button>
+            </div>
+            <form id="tagInfoForm">
+                <div class="form-group">
+                    <label>项目名称（标签）</label>
+                    <input type="text" id="tagNameDisplay" readonly style="background: #f0f0f0;">
+                </div>
+                <div class="form-group">
+                    <label>传播方向</label>
+                    <textarea id="tagDirection" placeholder="例如：汽车媒体、科技媒体、财经媒体"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>使用时间</label>
+                    <input type="text" id="tagUsageTime" placeholder="例如：2024年1月-3月">
+                </div>
+                <div class="form-group">
+                    <label>传播汇报链接</label>
+                    <input type="text" id="tagReportUrl" placeholder="粘贴文件链接，例如：https://drive.google.com/...">
+                    <small style="color: #999; font-size: 12px; display: block; margin-top: 5px;">
+                        💡 支持任何在线文件链接（网盘、PPT、PDF等），点击后可直接查看汇报
+                    </small>
+                </div>
+                <div class="form-group">
+                    <label>备注</label>
+                    <textarea id="tagRemarks" placeholder="其他备注信息"></textarea>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn-cancel" onclick="closeEditTagInfoModal()">取消</button>
+                    <button type="submit" class="btn-save">保存</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 活动详情页面 -->
+    <div id="activityDetailView" class="container activity-detail">
+        <div class="header">
+            <button class="back-btn" onclick="backToMain()" style="display: block;">← 返回列表</button>
+            <h1 id="activityTitle">活动详情</h1>
+            <p>查看该活动使用的所有媒体资源</p>
+        </div>
+
+        <div class="detail-header">
+            <h2 id="activityDetailName"></h2>
+            <div class="detail-stats">
+                <div class="detail-stat-item">
+                    <div class="label">使用资源数</div>
+                    <div class="value" id="detailResourceCount">0</div>
+                </div>
+                <div class="detail-stat-item">
+                    <div class="label">总费用</div>
+                    <div class="value" id="detailTotalCost">¥0</div>
+                </div>
+                <div class="detail-stat-item">
+                    <div class="label">传播汇报</div>
+                    <div class="value" id="detailReportLink" style="font-size: 16px;">
+                        <span style="color: #999;">-</span>
+                    </div>
+                </div>
+                <div class="detail-stat-item">
+                    <div class="label">媒体类型</div>
+                    <div class="value" id="detailMediaTypes" style="font-size: 16px;">-</div>
+                </div>
+            </div>
+            <div style="margin-top: 20px;">
+                <button class="export-btn" onclick="exportActivityToExcel()">📊 导出为Excel</button>
+            </div>
+        </div>
+
+        <div class="table-container">
+            <table id="activityDetailTable">
+                <thead>
+                    <tr>
+                        <th>序号</th>
+                        <th>媒体类型</th>
+                        <th>媒体名称</th>
+                        <th>代理公司</th>
+                        <th>原创/供稿</th>
+                        <th>内容类型</th>
+                        <th>发布平台</th>
+                        <th>详细资源</th>
+                        <th>单次费用</th>
+                        <th>主持人</th>
+                    </tr>
+                </thead>
+                <tbody id="activityDetailBody">
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- 编辑资源模态框 -->
+    <div id="modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalTitle">添加媒体资源</h2>
+                <button class="close-btn" onclick="closeModal()">&times;</button>
+            </div>
+            <form id="resourceForm">
+                <div class="form-group">
+                    <label>媒体类型</label>
+                    <input type="text" id="mediaType" required placeholder="例如：汽车、数码科技、新闻财经">
+                </div>
+                <div class="form-group">
+                    <label>媒体名称</label>
+                    <input type="text" id="mediaName" required placeholder="例如：连线Insight">
+                </div>
+                <div class="form-group">
+                    <label>代理公司</label>
+                    <input type="text" id="agencyCompany" placeholder="例如：鱼得水">
+                </div>
+                <div class="form-group">
+                    <label>原创/供稿</label>
+                    <select id="originalType" required>
+                        <option value="原创">原创</option>
+                        <option value="供稿">供稿</option>
+                        <option value="二创">二创</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>内容类型</label>
+                    <select id="contentType" required>
+                        <option value="图文">图文</option>
+                        <option value="视频">视频</option>
+                        <option value="多车视频">多车视频</option>
+                        <option value="单车视频">单车视频</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>发布平台</label>
+                    <input type="text" id="platform" required placeholder="例如：微信公众号、抖音、微博">
+                </div>
+                <div class="form-group">
+                    <label>详细资源</label>
+                    <textarea id="resourceDetail" required placeholder="详细描述资源内容..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label>资源频次</label>
+                    <input type="number" id="frequency" required min="1" value="1">
+                </div>
+                <div class="form-group">
+                    <label>单次费用（元）</label>
+                    <input type="number" id="singleCostInput" required min="0" step="0.01">
+                </div>
+                <div class="form-group">
+                    <label>是否可以申请主持人</label>
+                    <select id="hasHost">
+                        <option value="N">否</option>
+                        <option value="Y">是</option>
+                    </select>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn-cancel" onclick="closeModal()">取消</button>
+                    <button type="submit" class="btn-save">保存</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 添加活动标签模态框 -->
+    <div id="tagModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>添加活动标签</h2>
+                <button class="close-btn" onclick="closeTagModal()">&times;</button>
+            </div>
+            <div class="form-group">
+                <label>活动名称</label>
+                <input type="text" id="activityNameInput" placeholder="例如：春季新品发布会">
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn-cancel" onclick="closeTagModal()">取消</button>
+                <button type="button" class="btn-save" onclick="saveActivityTag()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ============ Firebase配置 ============
+        // 🔥 Firebase 配置信息
+        const firebaseConfig = {
+            apiKey: "AIzaSyD0yKbpLLKdrWOtKqy-Am7RidYxk1B0zio",
+            authDomain: "newnew-cc905.firebaseapp.com",
+            projectId: "newnew-cc905",
+            storageBucket: "newnew-cc905.firebasestorage.app",
+            messagingSenderId: "952975287416",
+            appId: "1:952975287416:web:cf04001b4b13c0c9a5b98d"
+        };
+
+        // 初始化Firebase
+        let db = null;
+        let firebaseReady = false;
+        let unsubscribeResources = null; // 用于取消监听
+        let unsubscribeConfig = null;
+        let isUpdatingFromFirebase = false; // 防止循环更新
+
+        try {
+            firebase.initializeApp(firebaseConfig);
+            db = firebase.firestore();
+            firebaseReady = true;
+            console.log('✅ Firebase初始化成功');
+        } catch (error) {
+            console.error('❌ Firebase初始化失败:', error);
+            firebaseReady = false;
+        }
+
+        // Firestore集合名称
+        const COLLECTION_RESOURCES = 'mediaResources';
+        const COLLECTION_CONFIG = 'config';
+
+        const ACCESS_PASSWORD = 'lixiang';
+
+        // 登录功能
+        document.addEventListener('DOMContentLoaded', function() {
+            // 检查是否已登录
+            if (sessionStorage.getItem('isLoggedIn') === 'true') {
+                showMainContent();
+                return;
+            }
+
+            const loginBtn = document.getElementById('loginBtn');
+            const passwordInput = document.getElementById('passwordInput');
+
+            if (loginBtn) {
+                loginBtn.addEventListener('click', function() {
+                    const input = passwordInput.value;
+                    if (input === ACCESS_PASSWORD) {
+                        sessionStorage.setItem('isLoggedIn', 'true');
+                        showMainContent();
+                    } else {
+                        document.getElementById('loginError').style.display = 'block';
+                        passwordInput.value = '';
+                        passwordInput.focus();
+                    }
+                });
+            }
+        });
+
+        // 显示主内容
+        async function showMainContent() {
+            document.getElementById('loginContainer').style.display = 'none';
+            document.getElementById('mainContent').style.display = 'block';
+
+            // 先显示初始数据
+            renderTable();
+            updateStats();
+
+            // 从云端加载
+            if (firebaseReady) {
+                await loadFromStorage();
+                renderTable();
+                updateStats();
+            }
+        }
+
+
+
+        let resources = [{"id": 1,"mediaType": "数码科技","mediaName": "连线Insight","agencyCompany": "鱼得水","originalType": "原创","contentType": "图文","platform": "微信公众号","detail": "连线Insight微信公众号头条原创文章\n扩散平台：","frequency": 1,"totalCost": 69300.0,"singleCost": 69300.0,"hasHost": "N","usedFrequency": 0,"activityTags": []},{"id": 2,"mediaType": "汽车","mediaName": "新渠道李霸天","agencyCompany": "鱼得水","originalType": "原创","contentType": "视频","platform": "抖音","detail": "视频*1，分发抖音，微博，小红书","frequency": 1,"totalCost": 100000.0,"singleCost": 100000.0,"hasHost": "N","usedFrequency": 0,"activityTags": []},{"id": 3,"mediaType": "汽车","mediaName": "新渠道李霸天","agencyCompany": "鱼得水","originalType": "原创","contentType": "图文","platform": "微博","detail": "图文微博，分发小红书，头条","frequency": 2,"totalCost": 15500.0,"singleCost": 7750.0,"hasHost": "N","usedFrequency": 0,"activityTags": []},{"id": 4,"mediaType": "汽车","mediaName": "张抗抗/小王同学Dr_EV","agencyCompany": "鱼得水","originalType": "原创","contentType": "视频","platform": "抖音","detail": "原创短视频（日常用车体验、能耗测试）","frequency": 2,"totalCost": 50000.0,"singleCost": 25000.0,"hasHost": "N","usedFrequency": 0,"activityTags": []},{"id": 5,"mediaType": "汽车","mediaName": "张抗抗/小王同学Dr_EV","agencyCompany": "鱼得水","originalType": "原创","contentType": "图文","platform": "微博","detail": "原创微博","frequency": 1,"totalCost": 86500.0,"singleCost": 86500.0,"hasHost": "N","usedFrequency": 0,"activityTags": []},{"id": 6,"mediaType": "新闻财经","mediaName": "节点财经","agencyCompany": "鱼得水","originalType": "原创","contentType": "图文","platform": "微信公众号","detail": "节点财经图文头条原创1篇（节点财经入驻35+个平台发布）","frequency": 1,"totalCost": 52400.0,"singleCost": 52400.0,"hasHost": "N","usedFrequency": 0,"activityTags": []},{"id": 7,"mediaType": "新闻财经","mediaName": "节点财经","agencyCompany": "鱼得水","originalType": "原创","contentType": "视频","platform": "视频号","detail": "节点财经视频号视频原创1条（节点财经视频号、抖音、腾讯新闻等）","frequency": 2,"totalCost": 40000.0,"singleCost": 20000.0,"hasHost": "N","usedFrequency": 0,"activityTags": []},{"id": 8,"mediaType": "汽车","mediaName": "高彦 Will","agencyCompany": "鱼得水","originalType": "原创","contentType": "视频","platform": "微博","detail": "微博发布+第三方分发（b站 小红书 视频号 头条 三垂平台）","frequency": 1,"totalCost": 92400.0,"singleCost": 92400.0,"hasHost": "N","usedFrequency": 0,"activityTags": []},{"id": 9,"mediaType": "汽车","mediaName": "贾佳Hondayes","agencyCompany": "鱼得水","originalType": "原创","contentType": "图文","platform": "微博","detail": "微博原创内容发布；其中两条为赠送","frequency": 7,"totalCost": 52500.0,"singleCost": 7500.0,"hasHost": "N","usedFrequency": 0,"activityTags": []},{"id": 10,"mediaType": "汽车","mediaName": "SUV大咖","agencyCompany": "鱼得水","originalType": "原创","contentType": "视频","platform": "微信公众号","detail": "SUV大咖微信公众号头条（含今日头条、懂车帝、车家号等分发平台）","frequency": 1,"totalCost": 105000.0,"singleCost": 105000.0,"hasHost": "N","usedFrequency": 0,"activityTags": []},{"id": 11,"mediaType": "数码科技","mediaName": "光子星球","agencyCompany": "鱼得水","originalType": "原创","contentType": "图文","platform": "微信公众号","detail": "光子星球微信公众号头条，赠送全平台分发（30个左右）","frequency": 1,"totalCost": 57750.0,"singleCost": 57750.0,"hasHost": "N","usedFrequency": 0,"activityTags": []},{"id": 12,"mediaType": "汽车","mediaName": "胖子车神暖暖","agencyCompany": "鱼得水","originalType": "原创","contentType": "视频","platform": "微博","detail": "微博长视频+各平台分发（懂车帝、汽车之家、易车、百家号、B站、视频号、快手、小红书）","frequency": 1,"totalCost": 50000.0,"singleCost": 50000.0,"hasHost": "N","usedFrequency": 0,"activityTags": []},{"id": 13,"mediaType": "汽车","mediaName": "胖子车神暖暖","agencyCompany": "鱼得水","originalType": "原创","contentType": "图文","platform": "微博","detail": "微博原创图文+各平台分发","frequency": 2,"totalCost": 50000.0,"singleCost": 25000.0,"hasHost": "N","usedFrequency": 0,"activityTags": []},{"id": 14,"mediaType": "汽车","mediaName": "胖子车神暖暖","agencyCompany": "鱼得水","originalType": "原创","contentType": "视频","platform": "抖音","detail": "抖音短视频（切片）+各平台分发","frequency": 1,"totalCost": 5000.0,"singleCost": 5000.0,"hasHost": "N","usedFrequency": 0,"activityTags": []},{"id": 15,"mediaType": "防负矩阵号","mediaName": "汽车行业关注/汽车营销分析","agencyCompany": "鱼得水","originalType": "原创","contentType": "图文","platform": "微信公众号","detail": "微信四条","frequency": 4,"totalCost": 126000.0,"singleCost": 31500.0,"hasHost": "N","usedFrequency": 0,"activityTags": []},{"id": 16,"mediaType": "防负矩阵号","mediaName": "快科技","agencyCompany": "鱼得水","originalType": "供稿","contentType": "图文","platform": "多平台","detail": "新闻资讯发布 全平台","frequency": 12,"totalCost": 157500.0,"singleCost": 13125.0,"hasHost": "N","usedFrequency": 0,"activityTags": []},{"id": 17,"mediaType": "防负矩阵号","mediaName": "IT之家","agencyCompany": "鱼得水","originalType": "原创","contentType": "图文","platform": "官网","detail": "原创-资讯/产品报道，原创资讯，同步分发到今日头条、百家号、搜狐号、网易号、企鹅号等聚合平台（每个链接算一条）","frequency": 12,"totalCost": 100000.0,"singleCost": 8333.33,"hasHost": "N","usedFrequency": 0,"activityTags": []},{"id": 18,"mediaType": "防负矩阵号","mediaName": "IT之家","agencyCompany": "鱼得水","originalType": "原创","contentType": "图文","platform": "微博","detail": "微博直发","frequency": 4,"totalCost": 15500.0,"singleCost": 3875.0,"hasHost": "N","usedFrequency": 0,"activityTags": []},{"id": 19,"mediaType": "国家级媒体","mediaName": "瞭望东方周刊","agencyCompany": "蓝标","originalType": "原创","contentType": "图文","platform": "微信+客户端+分发平台","detail": "新华社客户端信息流+瞭望财经（微信号）+所入驻的分发平台今日头条、微博、百家号3个平台","frequency": 2,"totalCost": 339611.65,"singleCost": 169805.83,"hasHost": "N","usedFrequency": 0,"activityTags": []},{"id": 20,"mediaType": "汽车","mediaName": "Myautotime","agencyCompany": "蓝标","originalType": "原创","contentType": "图文","platform": "微信公众号","detail": "Myautotime微信头条、搜狐、易车、今日头条、天天快报、汽车头条、一点资讯、网易、百家号、微博、车家号、水滴汽车、车市号、太平洋等","frequency": 2,"totalCost": 128640.78,"singleCost": 64320.39,"hasHost": "N","usedFrequency": 0,"activityTags": []},{"id": 21,"mediaType": "汽车","mediaName": "EV视界","agencyCompany": "蓝标","originalType": "原创","contentType": "图文","platform": "微信公众号","detail": "微信头条、搜狐、易车、今日头条、天天快报、汽车头条、一点资讯、网易、百家号、微博、车家号、水滴汽车、车市号、太平洋等","frequency": 1,"totalCost": 53514.4,"singleCost": 53514.4,"hasHost": "N","usedFrequency": 0,"activityTags": []},{"id": 22,"mediaType": "汽车","mediaName": "EV视界","agencyCompany": "蓝标","originalType": "原创","contentType": "视频","platform": "视频号","detail": "微信头条、搜狐、易车、今日头条、天天快报、汽车头条、一点资讯、网易、百家号、微博、车家号、水滴汽车、车市号、太平洋等","frequency": 1,"totalCost": 53514.4,"singleCost": 53514.4,"hasHost": "N","usedFrequency": 0,"activityTags": []},{"id": 23,"mediaType": "汽车","mediaName": "盖世汽车","agencyCompany": "蓝标","originalType": "原创","contentType": "图文","platform": "微信公众号","detail": "微信公众号次条*1，分发到盖世汽车每日速递 ","frequency": 1,"totalCost": 58301.89,"singleCost": 58301.89,"hasHost": "N","usedFrequency": 0,"activityTags": []},{"id": 24,"mediaType": "汽车","mediaName": "盖世汽车","agencyCompany": "蓝标","originalType": "原创","contentType": "图文","platform": "网站","detail": "赠送PC供稿发布","frequency": 1,"totalCost": 58301.89,"singleCost": 58301.89,"hasHost": "N","usedFrequency": 0,"activityTags": []},{"id": 25,"mediaType": "新闻财经","mediaName": "界面新闻","agencyCompany": "蓝标","originalType": "原创","contentType": "图文","platform": "微博","detail": "界面新闻微博原创，可以配合申请主持人","frequency": 1,"totalCost": 77250.0,"singleCost": 77250.0,"hasHost": "Y","usedFrequency": 0,"activityTags": []},{"id": 26,"mediaType": "新闻财经","mediaName": "界面新闻","agencyCompany": "蓝标","originalType": "原创","contentType": "视频","platform": "视频号","detail": "界面新闻视频号直发","frequency": 1,"totalCost": 77250.0,"singleCost": 77250.0,"hasHost": "N","usedFrequency": 0,"activityTags": []},{"id": 27,"mediaType": "新闻财经","mediaName": "财联社","agencyCompany": "蓝标","originalType": "原创","contentType": "图文","platform": "微博","detail": "微博*1，可以配合申请主持人","frequency": 1,"totalCost": 72877.355,"singleCost": 72877.35,"hasHost": "Y","usedFrequency": 0,"activityTags": []},{"id": 28,"mediaType": "新闻财经","mediaName": "财联社","agencyCompany": "蓝标","originalType": "原创","contentType": "图文","platform": "APP","detail": "电报*1","frequency": 1,"totalCost": 72877.355,"singleCost": 72877.35,"hasHost": "N","usedFrequency": 0,"activityTags": []},{"id": 29,"mediaType": "新闻财经","mediaName": "凤凰财经","agencyCompany": "蓝标","originalType": "原创","contentType": "视频","platform": "微博/视频号/抖音","detail": "-结合企业需求，进行视频制作，时长5min以内，内容策划及拍摄均由凤凰网完成；具体以双方确认可执行为准\n-结合节目内容，产出海报\n-配合长视频合作，由凤凰网财经精剪设计1支短视频，用于短视频平台传播，时长 60秒内\n发布渠道：凤凰网财经微博、凤凰网财经微信视频号、凤凰网财经抖音","frequency": 1,"totalCost": 194339.63,"singleCost": 194339.63,"hasHost": "Y","usedFrequency": 0,"activityTags": []},{"id": 30,"mediaType": "新闻财经","mediaName": "中国证券报","agencyCompany": "蓝标","originalType": "原创","contentType": "图文","platform": "报纸+APP客户端","detail": "中证报报纸A08版套红1/2版","frequency": 1,"totalCost": 100000.0,"singleCost": 100000.0,"hasHost": "N","usedFrequency": 0,"activityTags": []},{"id": 31,"mediaType": "新闻财经","mediaName": "中国证券报","agencyCompany": "蓝标","originalType": "原创","contentType": "图文","platform": "微信公众号","detail": "中证报微信信息流第2 条","frequency": 1,"totalCost": 60330.19,"singleCost": 60330.19,"hasHost": "N","usedFrequency": 0,"activityTags": []},{"id": 32,"mediaType": "汽车","mediaName": "苏黎世贝勒爷","agencyCompany": "蓝标","originalType": "原创","contentType": "视频","platform": "微博","detail": "原创短视频，分发微博、抖音、视频号、小红书","frequency": 2,"totalCost": 90000.0,"singleCost": 45000.0,"hasHost": "N","usedFrequency": 0,"activityTags": []},{"id": 33,"mediaType": "汽车","mediaName": "苏黎世贝勒爷","agencyCompany": "蓝标","originalType": "原创","contentType": "图文","platform": "微博","detail": "原创图文，微博（内容和形式不限）","frequency": 4,"totalCost": 7169.81,"singleCost": 1792.45,"hasHost": "N","usedFrequency": 0,"activityTags": []},{"id": 34,"mediaType": "汽车","mediaName": "GeekCar极客汽车","agencyCompany": "蓝标","originalType": "原创","contentType": "图文","platform": "微信公众号","detail": "微信公众号头条发布","frequency": 1,"totalCost": 145754.71,"singleCost": 145754.71,"hasHost": "N","usedFrequency": 0,"activityTags": []},{"id": 35,"mediaType": "汽车","mediaName": "郑博士","agencyCompany": "蓝标","originalType": "原创","contentType": "视频","platform": "微博","detail": "微博原创内容发布","frequency": 1,"totalCost": 64217.23,"singleCost": 64217.23,"hasHost": "N","usedFrequency": 0,"activityTags": []},{"id": 36,"mediaType": "汽车","mediaName": "王飞jackie","agencyCompany": "蓝标","originalType": "原创","contentType": "图文","platform": "微博","detail": "微博原创内容发布","frequency": 5,"totalCost": 51456.31,"singleCost": 10291.26,"hasHost": "N","usedFrequency": 0,"activityTags": []},{"id": 37,"mediaType": "汽车","mediaName": "科技犬","agencyCompany": "蓝标","originalType": "原创","contentType": "视频","platform": "微博+视频号","detail": "微博+视频号发布+其他分发平台","frequency": 1,"totalCost": 133786.41,"singleCost": 133786.41,"hasHost": "N","usedFrequency": 0,"activityTags": []},{"id": 38,"mediaType": "汽车","mediaName": "汽车像素","agencyCompany": "蓝标","originalType": "原创","contentType": "图文","platform": "微信公众号","detail": "微信公众号头条，（分发含今日头条、懂车帝、汽车之家、腾讯网、百家号、ZAKER新闻）","frequency": 1,"totalCost": 53514.36,"singleCost": 53514.36,"hasHost": "N","usedFrequency": 0,"activityTags": []},{"id": 39,"mediaType": "数码科技","mediaName": "科技daily","agencyCompany": "蓝标","originalType": "原创","contentType": "视频","platform": "微信公众号","detail": "微信公众号头条，分发微博、头条、微信视频号、百家号、哔哩哔哩、腾讯视频、网易号、搜狐、UC大鱼号、一点资讯、抖音、小红书、爱奇艺、知乎、什么值得买、汽车之家","frequency": 1,"totalCost": 30000.0,"singleCost": 30000.0,"hasHost": "N","usedFrequency": 0,"activityTags": []},{"id": 40,"mediaType": "数码科技","mediaName": "科技daily","agencyCompany": "蓝标","originalType": "原创","contentType": "图文","platform": "多平台","detail": "微博、头条、微信视频号、百家号、哔哩哔哩、腾讯视频、网易号、搜狐、UC大鱼号、一点资讯、抖音、小红书、爱奇艺、知乎、什么值得买、汽车之家","frequency": 1,"totalCost": 5622.97,"singleCost": 5622.97,"hasHost": "N","usedFrequency": 0,"activityTags": []},{"id": 41,"mediaType": "数码科技","mediaName": "科技daily","agencyCompany": "蓝标","originalType": "供稿","contentType": "图文","platform": "多平台","detail": "微博、头条、微信视频号、百家号、哔哩哔哩、腾讯视频、网易号、搜狐、UC大鱼号、一点资讯、抖音、小红书、爱奇艺、知乎、什么值得买、汽车之家","frequency": 2,"totalCost": 50000.0,"singleCost": 25000.0,"hasHost": "N","usedFrequency": 0,"activityTags": []},{"id": 42,"mediaType": "新闻财经","mediaName": "封面新闻","agencyCompany": "蓝标","originalType": "原创","contentType": "图文","platform": "微博","detail": "封面新闻官方微博 （原创、供稿均可）","frequency": 2,"totalCost": 67047.17,"singleCost": 33523.58,"hasHost": "N","usedFrequency": 0,"activityTags": []},{"id": 43,"mediaType": "新闻财经","mediaName": "封面新闻","agencyCompany": "蓝标","originalType": "原创","contentType": "图文","platform": "APP","detail": "其他各频道首位广告位1/3轮播+不少于5 个三方平台扩散","frequency": 1,"totalCost": 67047.17,"singleCost": 67047.17,"hasHost": "N","usedFrequency": 0,"activityTags": []},{"id": 44,"mediaType": "新闻财经","mediaName": "央视网","agencyCompany": "蓝标","originalType": "原创","contentType": "图文","platform": " 微信公众号","detail": "央视网微信公众号第二条发布图文稿件1次（本次含原创赠送）","frequency": 1,"totalCost": 169805.82,"singleCost": 169805.82,"hasHost": "N","usedFrequency": 0,"activityTags": []},{"id": 45,"mediaType": "新闻财经","mediaName": "中国基金报","agencyCompany": "蓝标","originalType": "原创","contentType": "视频","platform": "视频号","detail": "1个短视频，可以制作（需提供素材）+分发","frequency": 1,"totalCost": 63160.37,"singleCost": 63160.37,"hasHost": "N","usedFrequency": 0,"activityTags": []},{"id": 46,"mediaType": "汽车","mediaName": "有车以后","agencyCompany": "蓝标","originalType": "原创","contentType": "视频","platform": "微信公众号+全平台","detail": "原创视频-单车，微信次条发布","frequency": 1,"totalCost": 242924.525,"singleCost": 242924.52,"hasHost": "N","usedFrequency": 0,"activityTags": []},{"id": 47,"mediaType": "汽车","mediaName": "有车以后","agencyCompany": "蓝标","originalType": "原创","contentType": "视频","platform": "微信公众号+全平台","detail": "原创视频-双车，微信头条发布","frequency": 1,"totalCost": 242924.525,"singleCost": 242924.52,"hasHost": "N","usedFrequency": 0,"activityTags": []},{"id": 48,"mediaType": "汽车","mediaName": "大家车言论","agencyCompany": "蓝标","originalType": "原创","contentType": "视频","platform": "微博+全平台","detail": "YYP 出镜原创视频*1+袁启聪出镜原创视频*1","frequency": 2,"totalCost": 1020283.02,"singleCost": 510141.51,"hasHost": "N","usedFrequency": 0,"activityTags": []},{"id": 49,"mediaType": "数码科技","mediaName": "虎嗅","agencyCompany": "蓝标","originalType": "原创","contentType": "图文","platform": "微信&客户端","detail": "虎嗅微信头条位置发布+虎嗅APP/PC/M端频道页（自然下沉）+虎嗅第三方新闻客户端包含今日头条/搜狐新闻/zaker/网易新闻/一点资讯/凤凰号/百度新闻等（4-6个）","frequency": 1,"totalCost": 388679.245,"singleCost": 388679.24,"hasHost": "N","usedFrequency": 0,"activityTags": []},{"id": 50,"mediaType": "数码科技","mediaName": "虎嗅","agencyCompany": "蓝标","originalType": "原创","contentType": "图文","platform": "微信&客户端","detail": "微信三条+虎嗅第三方新闻客户端包含今日头条/搜狐新闻/zaker/网易新闻/一点资讯/凤凰号/百度新闻等（4-6个）","frequency": 2,"totalCost": 388679.245,"singleCost": 194339.62,"hasHost": "N","usedFrequency": 0,"activityTags": []},{"id": 51,"mediaType": "数码科技","mediaName": "36氪","agencyCompany": "蓝标","originalType": "原创","contentType": "图文","platform": "微信公众号","detail": "36氪微信第二条文章（午/晚）+微博推送分发新浪看点+百家号推送分发+企鹅号推送分发腾讯新闻","frequency": 2,"totalCost": 777358.49,"singleCost": 388679.24,"hasHost": "N","usedFrequency": 0,"activityTags": []},{"id": 52,"mediaType": "新闻财经","mediaName": "每日经济新闻","agencyCompany": "蓝标","originalType": "原创","contentType": "图文","platform": "微信","detail": "每经官方微信混发头条 （每经聚合平台转载）","frequency": 1,"totalCost": 145754.7175,"singleCost": 145754.72,"hasHost": "N","usedFrequency": 0,"activityTags": []},{"id": 53,"mediaType": "新闻财经","mediaName": "每日经济新闻","agencyCompany": "蓝标","originalType": "原创","contentType": "图文","platform": "微信","detail": "每经官方微信混发普通条 （每经聚合平台转载）","frequency": 1,"totalCost": 145754.7175,"singleCost": 145754.72,"hasHost": "N","usedFrequency": 0,"activityTags": []},{"id": 54,"mediaType": "新闻财经","mediaName": "每日经济新闻","agencyCompany": "蓝标","originalType": "原创","contentType": "图文","platform": "微博","detail": "每经微博直发 含申请主持人➕热推包","frequency": 3,"totalCost": 145754.7175,"singleCost": 48584.91,"hasHost": "Y","usedFrequency": 0,"activityTags": []},{"id": 55,"mediaType": "新闻财经","mediaName": "每日经济新闻","agencyCompany": "蓝标","originalType": "原创","contentType": "图文","platform": "微信","detail": "NBD汽车混发次头条 （每经聚合平台转载）","frequency": 1,"totalCost": 145754.7175,"singleCost": 145754.72,"hasHost": "N","usedFrequency": 0,"activityTags": []},{"id": 56,"mediaType": "新闻财经","mediaName": "第一财经","agencyCompany": "蓝标","originalType": "原创","contentType": "图文","platform": "微博+APP客户端","detail": "第一财经日报微博（含话题主持人+热推包），要闻页信息流第十一条三分之一轮，三方平台-企鹅号","frequency": 1,"totalCost": 128750.0,"singleCost": 128750.0,"hasHost": "Y","usedFrequency": 0,"activityTags": []},{"id": 57,"mediaType": "新闻财经","mediaName": "第一财经","agencyCompany": "蓝标","originalType": "原创","contentType": "图文","platform": "APP客户端","detail": "要闻页信息流第十一条三分之一轮，三方平台-第一财经今日头条号","frequency": 1,"totalCost": 128750.0,"singleCost": 128750.0,"hasHost": "N","usedFrequency": 0,"activityTags": []},{"id": 58,"mediaType": "新闻财经","mediaName": "第一财经","agencyCompany": "蓝标","originalType": "原创","contentType": "图文","platform": "APP客户端","detail": "要闻页信息流第十一条三分之一轮，三方平台-企鹅号","frequency": 1,"totalCost": 128750.0,"singleCost": 128750.0,"hasHost": "N","usedFrequency": 0,"activityTags": []},{"id": 59,"mediaType": "新闻财经","mediaName": "第一财经","agencyCompany": "蓝标","originalType": "原创","contentType": "图文","platform": "APP客户端","detail": "要闻页信息流第十一条三分之一轮，三方平台-企鹅号","frequency": 1,"totalCost": 128750.0,"singleCost": 128750.0,"hasHost": "N","usedFrequency": 0,"activityTags": []},{"id": 60,"mediaType": "新闻财经","mediaName": "经济观察报","agencyCompany": "蓝标","originalType": "原创","contentType": "图文","platform": "微信","detail": "微信次条原创（东方财富号、头条号、百家号、企鹅号、新浪看点、网易号、雪球号、大鱼号、大风号、搜狐号、一点资讯、ZAKER，最终发布成功以平台审核为准）","frequency": 3,"totalCost": 500000.0,"singleCost": 166666.67,"hasHost": "N","usedFrequency": 0,"activityTags": []},{"id": 61,"mediaType": "新闻财经","mediaName": "经济观察报","agencyCompany": "蓝标","originalType": "原创","contentType": "图文","platform": "微博/微信","detail": "经济观察报原创撰写（3000字内）+经济观察网信息流文字链（非焦点图）+经济观察报微博直发/转发+经观汽车微信头条","frequency": 1,"totalCost": 58726.41,"singleCost": 58726.41,"hasHost": "N","usedFrequency": 0,"activityTags": []},{"id": 62,"mediaType": "新闻财经","mediaName": "21世纪经济报道","agencyCompany": "蓝标","originalType": "原创","contentType": "图文","platform": "微信公众号","detail": "官微第二条位置+官博头条文章+21财经APP汽车频道第7条","frequency": 4,"totalCost": 558726.41,"singleCost": 139681.6,"hasHost": "N","usedFrequency": 0,"activityTags": []},{"id": 63,"mediaType": "汽车","mediaName": "张庆宣","agencyCompany": "蓝标","originalType": "原创","contentType": "图文","platform": "微博","detail": "微博话题资源包*1次\n预计投放媒体资源10个+、KOL资源40个+，赠送KOC、金橙V、素人资源以匹配话题热度，报价含方向策划。\nKOL资源主要以汽车、科技为主，优选行业有态度、有观点的优秀自媒体，话题数据、观点认知双保障。\n*费用仅为资源包，不保榜。\n话题运营曝光量大于1000万","frequency": 1,"totalCost": 154368.93,"singleCost": 154368.93,"hasHost": "Y","usedFrequency": 0,"activityTags": []},{"id": 64,"mediaType": "国家级媒体","mediaName": "半月谈","agencyCompany": "蓝标","originalType": "原创","contentType": "图文","platform": " 客户端APP","detail": "深度原创稿件+发布半月谈客户端主页焦点图","frequency": 2,"totalCost": 167617.93,"singleCost": 83808.96,"hasHost": "N","usedFrequency": 0,"activityTags": []},{"id": 65,"mediaType": "数码科技","mediaName": "自动驾驶之心","agencyCompany": "蓝标","originalType": "原创","contentType": "图文","platform": "微信公众号","detail": "微信公众号头条文章，分发知乎、知识星球","frequency": 1,"totalCost": 10702.875,"singleCost": 10702.88,"hasHost": "N","usedFrequency": 0,"activityTags": []},{"id": 66,"mediaType": "数码科技","mediaName": "自动驾驶之心","agencyCompany": "蓝标","originalType": "供稿","contentType": "图文","platform": "微信公众号","detail": "微信公众号头条文章，分发知乎、知识星球","frequency": 1,"totalCost": 10702.875,"singleCost": 10702.88,"hasHost": "N","usedFrequency": 0,"activityTags": []},{"id": 67,"mediaType": "数码科技","mediaName": "Eva的科技生活","agencyCompany": "索伦- B站","originalType": "原创","contentType": "视频","platform": "B站","detail": "B站、微博、视频号及免费授权站外肖像授权和二创授权，授权时间6个月（官方使用会提前沟通）","frequency": 1,"totalCost": 124917.45,"singleCost": 124917.45,"hasHost": "N","usedFrequency": 0,"activityTags": []},{"id": 68,"mediaType": "汽车","mediaName": "绿芯频道_ECC","agencyCompany": "索伦- B站","originalType": "原创","contentType": "视频","platform": "B站","detail": "B站、微博、油管、小红书、抖音、视频号、懂车帝、易车、车家号、知乎、腾讯科技及免费授权站外肖像授权和二创授权，授权时间6个月（官方使用会提前沟通）","frequency": 1,"totalCost": 124917.45,"singleCost": 124917.45,"hasHost": "N","usedFrequency": 0,"activityTags": []},{"id": 69,"mediaType": "AI","mediaName": "十字路口crossing/Koji杨远骋","agencyCompany": "蓝标","originalType": "原创","contentType": "图文","platform": "小红书","detail": "","frequency": 1,"totalCost": 1000000.0,"singleCost": 1000000.0,"hasHost": "N","usedFrequency": 0,"activityTags": []},{"id": 70,"mediaType": "新闻财经","mediaName": "子弹财经","agencyCompany": "视频号-省广","originalType": "原创","contentType": "图文","platform": "微信公众号","detail": "原创图文-微信公众号头条\n单推原创1篇：微信公众号头条＋全网同步分发+同步分发社群渠道","frequency": 1,"totalCost": 64999.5,"singleCost": 64999.5,"hasHost": "N","usedFrequency": 0,"activityTags": []},{"id": 71,"mediaType": "新闻财经","mediaName": "子弹财经","agencyCompany": "视频号-省广","originalType": "原创","contentType": "视频","platform": "视频号","detail": "原创视频1支（3分钟内）+全网同步分发+同步分发社群渠道（赠送资源）","frequency": 1,"totalCost": 64999.5,"singleCost": 64999.5,"hasHost": "N","usedFrequency": 0,"activityTags": []},{"id": 72,"mediaType": "数码科技","mediaName": "亿欧汽车","agencyCompany": "视频号-省广","originalType": "原创","contentType": "图文","platform": "微信公众号","detail": "原创图文-微信公众号头条\n1篇原创：1.亿欧汽车采写标深度文章，文章篇幅2000字以上，采写周期3-5天。发布在亿欧汽车微信公众号及以下渠道。\n2.发稿渠道：今日头条（微头条）、微博、雪球、企鹅号、网易号、搜狐号、百家号、一点资讯、大鱼号、界面新闻、大风、 同花顺、东方财富、新浪看点，发布时根据稿件审核情况交付8个。（部分渠道受平台审核限制不做发布保证）\n原创内容推送汽车自动驾驶、科技出行等行业社群不少于5 个","frequency": 1,"totalCost": 66666.30666667,"singleCost": 66666.31,"hasHost": "N","usedFrequency": 0,"activityTags": []},{"id": 73,"mediaType": "数码科技","mediaName": "亿欧汽车","agencyCompany": "视频号-省广","originalType": "原创","contentType": "图文","platform": "微信公众号","detail": "微信次条文章\n1.【亿欧网】采写标准文章，文章篇幅1500字以上，采写周期2-3天。发布在亿欧微信公众号次条及以下渠道。\n2.发稿渠道：今日头条（微头条）、微博、雪球、企鹅号、网易号、搜狐号、百家号、一点资讯、大鱼号、界面新闻、大风、 同花顺、东方财富、新浪看点，发布时根据稿件审核情况交付8个。（部分渠道受平台审核限制不做发布保证）","frequency": 1,"totalCost": 66666.30666667,"singleCost": 66666.31,"hasHost": "N","usedFrequency": 0,"activityTags": []},{"id": 74,"mediaType": "数码科技","mediaName": "亿欧汽车","agencyCompany": "视频号-省广","originalType": "二创","contentType": "图文","platform": "快讯","detail": "亿欧官网发布（资讯）\n发布渠道：亿欧官网（战略伙伴资源，不单独售卖）","frequency": 4,"totalCost": 66666.30666667,"singleCost": 16666.58,"hasHost": "N","usedFrequency": 0,"activityTags": []},{"id": 75,"mediaType": "数码科技","mediaName": "光锥智能","agencyCompany": "视频号-省广","originalType": "原创","contentType": "图文","platform": "微信公众号","detail": "原创图文-微信公众号头条\n1、公众号约稿内容可赠送发布渠道近 30个：微信、澎湃，人民网客户端，36氪、虎嗅、钛媒体、今日头条、百家号、腾讯、搜狐、网易、凤凰、新浪、微博、富途、知乎、和讯、界面、创业邦、21财经、蓝鲸财经、格隆汇、OFweek等媒体平台。（部分平台需审核内容）\n2、赠送视频号平台直播一次。\n备注：合作报价的价格有效期-半年","frequency": 1,"totalCost": 79999.71,"singleCost": 79999.71,"hasHost": "N","usedFrequency": 0,"activityTags": []},{"id": 76,"mediaType": "数码科技","mediaName": "autocarweekly","agencyCompany": "视频号-省广","originalType": "原创","contentType": "图文","platform": "微信公众号","detail": "微信公众号头条，扩散至全平台\n价格有效期到Q1，3月底前要消耗","frequency": 1,"totalCost": 129999.44,"singleCost": 129999.44,"hasHost": "N","usedFrequency": 0,"activityTags": []},{"id": 77,"mediaType": "数码科技","mediaName": "汽车之心","agencyCompany": "视频号-省广","originalType": "原创","contentType": "图文","platform": "微信公众号","detail": "主平台微信公众号头条，免费分发至今日头条、懂车帝、车家号、易车、微博等平台。\n价格有效期到Q2","frequency": 1,"totalCost": 99999.46,"singleCost": 99999.46,"hasHost": "N","usedFrequency": 0,"activityTags": []},{"id": 78,"mediaType": "汽车","mediaName": "伊布车生活","agencyCompany": "视频号-省广","originalType": "原创","contentType": "视频","platform": "微信-视频号","detail": "视频号原创内容发布+第三方平台分发（抖音  快手 小红书 微博 B站 懂车帝 汽车之家 易车   优酷 爱奇艺 今日头条 西瓜视频 知乎）","frequency": 1,"totalCost": 79999.71,"singleCost": 79999.71,"hasHost": "N","usedFrequency": 0,"activityTags": []},{"id": 79,"mediaType": "汽车","mediaName": "玩车报告","agencyCompany": "视频号-省广","originalType": "原创","contentType": "视频","platform": " 全平台","detail": "主动安全创意视频，上下2集，视频号、抖音、快手、今日头条、微博、小红书、百家号-有驾、网上车市、搜狐","frequency": 2,"totalCost": 449999.76,"singleCost": 224999.88,"hasHost": "N","usedFrequency": 0,"activityTags": []},{"id": 80,"mediaType": "汽车","mediaName": "刘宝华（车Riff）","agencyCompany": "视频号-省广","originalType": "原创","contentType": "视频","platform": "视频号","detail": "1个长视频","frequency": 1,"totalCost": 49999.73,"singleCost": 49999.73,"hasHost": "N","usedFrequency": 0,"activityTags": []},{"id": 81,"mediaType": "汽车","mediaName": "PQ-管仲窥豹","agencyCompany": "视频号-省广","originalType": "原创","contentType": "视频","platform": "视频号","detail": "原创长视频，分发小红书、视频号、微博","frequency": 2,"totalCost": 49999.92,"singleCost": 24999.96,"hasHost": "N","usedFrequency": 0,"activityTags": []},{"id": 82,"mediaType": "汽车","mediaName": "PQ-管仲窥豹","agencyCompany": "视频号-省广","originalType": "原创","contentType": "图文","platform": "微信公众号","detail": "原创图文，微信公众号头条","frequency": 1,"totalCost": 49999.92,"singleCost": 49999.92,"hasHost": "N","usedFrequency": 0,"activityTags": []},{"id": 83,"mediaType": "汽车","mediaName": "PQ-管仲窥豹","agencyCompany": "视频号-省广","originalType": "原创","contentType": "图文","platform": "微博","detail": "赠送微博10条，不计入合同","frequency": 10,"totalCost": 49999.92,"singleCost": 4999.99,"hasHost": "N","usedFrequency": 0,"activityTags": []},{"id": 84,"mediaType": "数码科技","mediaName": "智驾daily","agencyCompany": "视频号-省广","originalType": "原创","contentType": "视频","platform": "视频号","detail": "3-5分钟中长视频，发布在微博、懂车帝、车家号等","frequency": 1,"totalCost": 79999.71,"singleCost": 79999.71,"hasHost": "N","usedFrequency": 0,"activityTags": []},{"id": 85,"mediaType": "数码科技","mediaName": "雷峰网-林军（左林右狸）","agencyCompany": "视频号-省广","originalType": "原创","contentType": "视频","platform": "视频号","detail": "左林右狸视频号 长视频（3-4min）","frequency": 2,"totalCost": 99999.46,"singleCost": 49999.73,"hasHost": "N","usedFrequency": 0,"activityTags": []},{"id": 86,"mediaType": "汽车","mediaName": "HD 说车","agencyCompany": "视频号-省广","originalType": "原创","contentType": "视频","platform": "视频号","detail": "原创长视频，分发至车家号、易车号、爱咖号、懂车帝、头条号、百家号、好看视频、搜狐号、微博、优酷、爱奇艺（分发平台有些可能临时有审核不通过，可替换其他平台）","frequency": 1,"totalCost": 49999.73,"singleCost": 49999.73,"hasHost": "N","usedFrequency": 0,"activityTags": []},{"id": 87,"mediaType": "汽车","mediaName": "HD 说车","agencyCompany": "视频号-省广","originalType": "原创","contentType": "图文","platform": "微博","detail": "赠送微博2条，不计入合同","frequency": 2,"totalCost": 49999.73,"singleCost": 24999.87,"hasHost": "N","usedFrequency": 0,"activityTags": []},{"id": 88,"mediaType": "汽车","mediaName": "蔡蔡籽同学","agencyCompany": "视频号-省广","originalType": "原创","contentType": "视频","platform": "视频号","detail": "原创长视频，分发微博、小红书、车家号、易车号、懂车号","frequency": 1,"totalCost": 99999.46,"singleCost": 99999.46,"hasHost": "N","usedFrequency": 0,"activityTags": []},{"id": 89,"mediaType": "数码科技","mediaName": "新智元","agencyCompany": "视频号-省广","originalType": "原创","contentType": "图文","platform": "微信公众号","detail": "原创图文-微信公众号头条\n单推原创1篇","frequency": 1,"totalCost": 79999.71,"singleCost": 79999.71,"hasHost": "N","usedFrequency": 0,"activityTags": []},{"id": 90,"mediaType": "AI","mediaName": "数字生命卡兹克","agencyCompany": "视频号-省广","originalType": "原创","contentType": "图文","platform": "微信公众号","detail": "头条*1+知乎、小红书、腾讯新闻、微博等内容同步","frequency": 1,"totalCost": 119999.94,"singleCost": 119999.94,"hasHost": "N","usedFrequency": 0,"activityTags": []},{"id": 91,"mediaType": "汽车","mediaName": "Nice好车","agencyCompany": "视频号-省广","originalType": "原创","contentType": "视频","platform": "多平台","detail": "【60s以内】*1条，【真人出镜棚拍/二创】可以使用8次 \n平台：汽车之家/微博/易车/百家号/搜狐/太平洋号/水滴汽车/网易","frequency": 1,"totalCost": 99999.46,"singleCost": 99999.46,"hasHost": "N","usedFrequency": 0,"activityTags": []},{"id": 92,"mediaType": "汽车","mediaName": "42号车库","agencyCompany": "视频号-省广","originalType": "原创","contentType": "视频","platform": "视频号","detail": "3车横评长视频+全平台发布；","frequency": 3,"totalCost": 359999.99,"singleCost": 120000.0,"hasHost": "N","usedFrequency": 0,"activityTags": []},{"id": 93,"mediaType": "汽车","mediaName": "43号车库","agencyCompany": "视频号-省广","originalType": "原创","contentType": "视频","platform": "视频号","detail": "单车深度测评长视频+全平台发布","frequency": 1,"totalCost": 359999.99,"singleCost": 359999.99,"hasHost": "N","usedFrequency": 0,"activityTags": []},{"id": 94,"mediaType": "汽车","mediaName": "44号车库","agencyCompany": "视频号-省广","originalType": "原创","contentType": "图文","platform": " 微信公众号","detail": "1篇长图文+微信公众号发布","frequency": 1,"totalCost": 359999.99,"singleCost": 359999.99,"hasHost": "N","usedFrequency": 0,"activityTags": []},{"id": 95,"mediaType": "汽车","mediaName": "45号车库","agencyCompany": "视频号-省广","originalType": "原创","contentType": "图文","platform": "微博","detail": " 原创微博","frequency": 10,"totalCost": 359999.99,"singleCost": 36000.0,"hasHost": "N","usedFrequency": 0,"activityTags": []},{"id": 96,"mediaType": "汽车","mediaName": "新出行","agencyCompany": "视频号-省广","originalType": "原创","contentType": "视频","platform": "视频号","detail": "三车对比视频+全平台发布；","frequency": 3,"totalCost": 479999.98666667,"singleCost": 160000.0,"hasHost": "N","usedFrequency": 0,"activityTags": []},{"id": 97,"mediaType": "汽车","mediaName": "新出行","agencyCompany": "视频号-省广","originalType": "原创","contentType": "图文","platform": "网站+微博","detail": "线上话题互动","frequency": 3,"totalCost": 479999.98666667,"singleCost": 160000.0,"hasHost": "N","usedFrequency": 0,"activityTags": []},{"id": 98,"mediaType": "汽车","mediaName": "新出行","agencyCompany": "视频号-省广","originalType": "原创","contentType": "图文","platform": "网站+微博+微信","detail": "新出行一图","frequency": 1,"totalCost": 479999.98666667,"singleCost": 479999.99,"hasHost": "N","usedFrequency": 0,"activityTags": []},{"id": 99,"mediaType": "汽车","mediaName": "Autolab","agencyCompany": "视频号-省广","originalType": "原创","contentType": "多车视频","platform": "视频号","detail": "主动安全3车横评，分发多平台","frequency": 1,"totalCost": 299999.68,"singleCost": 299999.68,"hasHost": "N","usedFrequency": 0,"activityTags": []},{"id": 100,"mediaType": "汽车","mediaName": "Autolab","agencyCompany": "视频号-省广","originalType": "","contentType": "单车视频","platform": "视频号","detail": "单车评测，分发多平台","frequency": 1,"totalCost": 299999.68,"singleCost": 299999.68,"hasHost": "N","usedFrequency": 0,"activityTags": []},{"id": 101,"mediaType": "数码科技","mediaName": "晚点Latepost/晚点汽车","agencyCompany": "视频号-省广","originalType": "原创","contentType": "图文","platform": "微信公众号","detail": "晚点Latepost微信公众号头条（5000-7000字）*1+第三方平台分发","frequency": 1,"totalCost": 199999.68,"singleCost": 199999.68,"hasHost": "N","usedFrequency": 0,"activityTags": []},{"id": 102,"mediaType": "数码科技","mediaName": "晚点Latepost/晚点汽车","agencyCompany": "视频号-省广","originalType": "原创","contentType": "图文","platform": "微信公众号","detail": "晚点Auto微信公众号头条（3000-4000字）*1+第三方平台分发","frequency": 1,"totalCost": 199999.68,"singleCost": 199999.68,"hasHost": "N","usedFrequency": 0,"activityTags": []},{"id": 103,"mediaType": "数码科技","mediaName": "晚点Latepost/晚点汽车","agencyCompany": "视频号-省广","originalType": "原创","contentType": "图文","platform": "微博","detail": "晚点Latepost微博直发*1","frequency": 1,"totalCost": 199999.68,"singleCost": 199999.68,"hasHost": "N","usedFrequency": 0,"activityTags": []},{"id": 104,"mediaType": "数码科技","mediaName": "钛媒体","agencyCompany": "视频号-省广","originalType": "原创","contentType": "图文","platform": "多平台","detail": "钛媒体微信二条； 钛媒体PC＋APP+WAP页面同步推送；\n全分发平台同步推送（今日头条、网易、新浪、凤凰、百家号等不少于8家）","frequency": 1,"totalCost": 300000.0,"singleCost": 300000.0,"hasHost": "N","usedFrequency": 0,"activityTags": []},{"id": 105,"mediaType": "数码科技","mediaName": "钛媒体","agencyCompany": "视频号-省广","originalType": "供稿","contentType": "视频","platform": "视频号","detail": "视频号直发","frequency": 2,"totalCost": 79999.55,"singleCost": 39999.78,"hasHost": "N","usedFrequency": 0,"activityTags": []},{"id": 106,"mediaType": "新闻财经","mediaName": "三言财经","agencyCompany": "视频号-省广","originalType": "原创","contentType": "图文","platform": "微信公众号","detail": "微信公众号次条，原创，每篇同步5个平台；","frequency": 1,"totalCost": 29999.97,"singleCost": 29999.97,"hasHost": "N","usedFrequency": 0,"activityTags": []},{"id": 107,"mediaType": "新闻财经","mediaName": "三言财经","agencyCompany": "视频号-省广","originalType": "供稿","contentType": "图文","platform": "多平台","detail": "微博直发，每次同步5个平台","frequency": 15,"totalCost": 29999.97,"singleCost": 2000.0,"hasHost": "N","usedFrequency": 0,"activityTags": []},{"id": 108,"mediaType": "防负矩阵号","mediaName": "鞭牛士","agencyCompany": "视频号-省广","originalType": "原创","contentType": "图文","platform": "多平台","detail": "头条原创*2条，同步全平台","frequency": 2,"totalCost": 53333.14333333,"singleCost": 26666.57,"hasHost": "N","usedFrequency": 0,"activityTags": []},{"id": 109,"mediaType": "防负矩阵号","mediaName": "鞭牛士","agencyCompany": "视频号-省广","originalType": "供稿","contentType": "图文","platform": "全平台","detail": "微信公众号次条图文供稿，同步全平台；","frequency": 2,"totalCost": 53333.14333333,"singleCost": 26666.57,"hasHost": "N","usedFrequency": 0,"activityTags": []},{"id": 110,"mediaType": "防负矩阵号","mediaName": "鞭牛士","agencyCompany": "视频号-省广","originalType": "原创","contentType": "图文","platform": "微博","detail": "微博直发，全平台推广，网站+全平台，","frequency": 20,"totalCost": 53333.14333333,"singleCost": 2666.66,"hasHost": "N","usedFrequency": 0,"activityTags": []},{"id": 111,"mediaType": "汽车","mediaName": "朱桢的一天","agencyCompany": "视频号-省广","originalType": "原创","contentType": "视频","platform": "视频号","detail": "60s以上视频","frequency": 1,"totalCost": 36601.42,"singleCost": 36601.42,"hasHost": "N","usedFrequency": 0,"activityTags": []}];
+
+        let currentFilter = 'all';
+        let currentFilterType = 'status';
+        let currentTagFilter = null;
+        let currentMediaTypeFilter = null;
+        let currentContentTypeFilter = null;
+        let currentPlatformFilter = null;
+        let currentHostFilter = null;
+        let currentSearch = '';
+
+        // 标签汇总页面筛选变量
+        let currentSummaryTagNameFilter = null;
+        let currentSummaryDirectionFilter = null;
+        let currentSummaryTimeFilter = null;
+        let currentSummarySearch = '';
+
+        let editingId = null;
+        let currentTagResourceId = null;
+        let currentActivityName = '';
+        let currentEditingTag = null;
+
+        // 标签额外信息存储
+        let tagInfoMap = {};
+
+        // 为标签生成不同颜色（低饱和度稳重配色）
+        const tagColors = [
+            'linear-gradient(135deg, #546e7a 0%, #37474f 100%)',
+            'linear-gradient(135deg, #8d6e63 0%, #6d4c41 100%)',
+            'linear-gradient(135deg, #78909c 0%, #546e7a 100%)',
+            'linear-gradient(135deg, #7cb342 0%, #558b2f 100%)',
+            'linear-gradient(135deg, #fb8c00 0%, #e65100 100%)',
+            'linear-gradient(135deg, #5c6bc0 0%, #3949ab 100%)',
+            'linear-gradient(135deg, #90a4ae 0%, #607d8b 100%)',
+            'linear-gradient(135deg, #ef5350 0%, #c62828 100%)',
+            'linear-gradient(135deg, #a1887f 0%, #6d4c41 100%)',
+            'linear-gradient(135deg, #42a5f5 0%, #1565c0 100%)'
+        ];
+
+        let tagColorMap = {};
+
+        function getTagColor(tagName) {
+            if (!tagColorMap[tagName]) {
+                const colorIndex = Object.keys(tagColorMap).length % tagColors.length;
+                tagColorMap[tagName] = tagColors[colorIndex];
+            }
+            return tagColorMap[tagName];
+        }
+
+        // 从localStorage或Firebase加载数据
+        async function loadFromStorage() {
+            if (firebaseReady) {
+                await loadFromFirebase();
+            } else {
+                loadFromLocalStorage();
+            }
+        }
+
+        // 从Firebase加载并设置实时监听
+        async function loadFromFirebase() {
+            try {
+                console.log('📥 从云端加载数据并启用实时同步...');
+
+                // 首先检查是否有数据
+                const snapshot = await db.collection(COLLECTION_RESOURCES).get();
+
+                if (snapshot.empty) {
+                    // 检查是否已经初始化过
+                    const configDoc = await db.collection(COLLECTION_CONFIG).doc('systemConfig').get();
+                    const isInitialized = configDoc.exists && configDoc.data().dataInitialized;
+
+                    if (isInitialized) {
+                        // 已初始化但数据被清空了，提示用户导入备份
+                        console.log('⚠️ 检测到数据库为空但系统已初始化，请导入备份');
+                        alert('⚠️ 数据库为空\n\n请使用"📥 导入备份"或"📋 批量导入"功能恢复数据。');
+                        // 设置空的实时监听，等待用户导入数据
+                        setupRealtimeListeners();
+                        return;
+                    } else {
+                        // 首次使用，自动初始化
+                        console.log('🎉 首次使用，正在初始化基础数据...');
+                        await uploadInitialData();
+                        // uploadInitialData 会重新调用 loadFromFirebase，所以这里直接返回
+                        return;
+                    }
+                }
+
+                // 先主动加载一次标签信息（确保刷新页面时能立即获取到）
+                const tagInfoDoc = await db.collection(COLLECTION_CONFIG).doc('tagInfoMap').get();
+                if (tagInfoDoc.exists && tagInfoDoc.data().info) {
+                    tagInfoMap = tagInfoDoc.data().info;
+                    console.log('✅ 已加载标签信息:', Object.keys(tagInfoMap).length, '个标签');
+                }
+
+                // 设置实时监听
+                setupRealtimeListeners();
+
+                console.log('✅ 实时同步已启用！所有用户的修改会自动同步');
+
+            } catch (error) {
+                console.error('❌ 云端加载失败，使用本地存储:', error);
+                loadFromLocalStorage();
+            }
+        }
+
+        // 设置实时监听（独立函数）
+        function setupRealtimeListeners() {
+            // 设置实时监听 - 资源数据
+            unsubscribeResources = db.collection(COLLECTION_RESOURCES).onSnapshot(snapshot => {
+                isUpdatingFromFirebase = true;
+
+                resources = [];
+                snapshot.forEach(doc => {
+                    resources.push({ ...doc.data(), firestoreId: doc.id });
+                });
+
+                console.log(`🔄 实时更新：已同步 ${resources.length} 个资源`);
+                renderTable();
+                updateStats();
+
+                isUpdatingFromFirebase = false;
+            }, error => {
+                console.error('❌ 实时监听错误:', error);
+                loadFromLocalStorage();
+            });
+
+            // 设置实时监听 - 标签颜色配置
+            unsubscribeConfig = db.collection(COLLECTION_CONFIG).doc('tagColorMap').onSnapshot(doc => {
+                if (doc.exists) {
+                    tagColorMap = doc.data().colors || {};
+                    // 如果正在显示主列表，重新渲染以更新标签颜色
+                    if (document.getElementById('mainView').style.display !== 'none') {
+                        renderTable();
+                    }
+                }
+            }, error => {
+                console.error('❌ 配置监听错误:', error);
+            });
+
+            // 设置实时监听 - 标签信息配置（传播方向、使用时间、备注等）
+            unsubscribeTagInfo = db.collection(COLLECTION_CONFIG).doc('tagInfoMap').onSnapshot(doc => {
+                if (doc.exists && doc.data().info) {
+                    tagInfoMap = doc.data().info;
+                    console.log('🔄 标签信息已同步', Object.keys(tagInfoMap).length, '个标签');
+                } else {
+                    // 文档不存在或为空时，保持当前的 tagInfoMap
+                    console.log('⚠️ 云端暂无标签信息');
+                }
+                // 如果正在显示标签汇总页面，重新渲染
+                if (document.getElementById('tagSummaryView') && document.getElementById('tagSummaryView').classList.contains('active')) {
+                    renderTagSummary();
+                }
+            }, error => {
+                console.error('❌ 标签信息监听错误:', error);
+            });
+
+            // 显示同步指示器
+            const syncIndicator = document.getElementById('syncIndicator');
+            if (syncIndicator) {
+                syncIndicator.style.display = 'inline-flex';
+            }
+        }
+
+        // 上传初始数据到Firebase
+        async function uploadInitialData() {
+            try {
+                const batch = db.batch();
+                resources.forEach(resource => {
+                    const docRef = db.collection(COLLECTION_RESOURCES).doc();
+                    resource.firestoreId = docRef.id;
+                    const { firestoreId, ...data } = resource;
+                    batch.set(docRef, data);
+                });
+                await batch.commit();
+
+                // 设置初始化标记，防止未来重复上传
+                await db.collection(COLLECTION_CONFIG).doc('systemConfig').set({
+                    dataInitialized: true,
+                    initializedat: new Date().toISOString(),
+                    version: '1.0'
+                }, { merge: true });
+
+                console.log('✅ 初始数据上传完成并标记已初始化');
+                await loadFromFirebase();
+            } catch (error) {
+                console.error('❌ 上传失败:', error);
+            }
+        }
+
+        // 从localStorage加载（降级方案）
+        function loadFromLocalStorage() {
+            // 保存初始数据（包含agencyCompany）
+            const initialResources = [...resources];
+
+            const stored = localStorage.getItem('mediaResources');
+            if (stored) {
+                try {
+                    const storedResources = JSON.parse(stored);
+
+                    // 合并数据：保留localStorage中的用户数据（usedFrequency, activityTags）
+                    // 同时更新agencyCompany等初始数据
+                    resources = initialResources.map(initRes => {
+                        const storedRes = storedResources.find(sr => sr.id === initRes.id);
+                        if (storedRes) {
+                            // 合并：保留用户数据，更新基础信息
+                            return {
+                                ...initRes,
+                                usedFrequency: storedRes.usedFrequency || 0,
+                                activityTags: storedRes.activityTags || []
+                            };
+                        }
+                        return initRes;
+                    });
+
+                    // 保存合并后的数据
+                    saveToStorage();
+                } catch (e) {
+                    console.error('数据加载失败', e);
+                }
+            }
+
+            const storedColorMap = localStorage.getItem('tagColorMap');
+            if (storedColorMap) {
+                try {
+                    tagColorMap = JSON.parse(storedColorMap);
+                } catch (e) {
+                    console.error('颜色映射加载失败', e);
+                }
+            }
+
+            const storedTagInfoMap = localStorage.getItem('tagInfoMap');
+            if (storedTagInfoMap) {
+                try {
+                    tagInfoMap = JSON.parse(storedTagInfoMap);
+                } catch (e) {
+                    console.error('标签信息加载失败', e);
+                }
+            }
+        }
+
+        // 保存到localStorage或Firebase
+        async function saveToStorage() {
+            if (firebaseReady) {
+                await saveToFirebase();
+            } else {
+                saveToLocalStorage();
+            }
+        }
+
+        // 保存到Firebase
+        async function saveToFirebase() {
+            // 如果正在从Firebase更新，不要再保存回去（避免循环）
+            if (isUpdatingFromFirebase) {
+                return;
+            }
+
+            try {
+                const batch = db.batch();
+
+                resources.forEach(resource => {
+                    if (resource.firestoreId) {
+                        const docRef = db.collection(COLLECTION_RESOURCES).doc(resource.firestoreId);
+                        const { firestoreId, ...data } = resource;
+                        batch.update(docRef, data);
+                    } else {
+                        const docRef = db.collection(COLLECTION_RESOURCES).doc();
+                        resource.firestoreId = docRef.id;
+                        const { firestoreId, ...data } = resource;
+                        batch.set(docRef, data);
+                    }
+                });
+
+                // 保存标签颜色
+                const colorMapRef = db.collection(COLLECTION_CONFIG).doc('tagColorMap');
+                batch.set(colorMapRef, { colors: tagColorMap }, { merge: true });
+
+                // 保存标签信息（传播方向、使用时间、备注等）
+                const tagInfoRef = db.collection(COLLECTION_CONFIG).doc('tagInfoMap');
+                batch.set(tagInfoRef, { info: tagInfoMap }, { merge: true });
+
+                await batch.commit();
+                console.log('✅ 数据已保存到云端（其他用户会自动看到更新）');
+            } catch (error) {
+                console.error('❌ 保存失败:', error);
+                saveToLocalStorage();
+            }
+        }
+
+        // 保存到localStorage（降级方案）
+        function saveToLocalStorage() {
+            localStorage.setItem('mediaResources', JSON.stringify(resources));
+            localStorage.setItem('tagColorMap', JSON.stringify(tagColorMap));
+            localStorage.setItem('tagInfoMap', JSON.stringify(tagInfoMap));
+        }
+
+        // 计算剩余费用
+        function calculateRemainingCost(resource) {
+            const used = resource.usedFrequency || 0;
+            const remaining = resource.frequency - used;
+            return (resource.singleCost * remaining).toFixed(2);
+        }
+
+        // 更新统计数据
+        function updateStats() {
+            const total = resources.length;
+            const availableResources = resources.filter(r => (r.usedFrequency || 0) < r.frequency).length;
+            const usedUpResources = total - availableResources;
+            const remainingFreq = resources.reduce((sum, r) => {
+                const used = r.usedFrequency || 0;
+                return sum + (r.frequency - used);
+            }, 0);
+
+            document.getElementById('totalResources').textContent = total;
+            document.getElementById('availableResources').textContent = availableResources;
+            document.getElementById('usedUpResources').textContent = usedUpResources;
+            document.getElementById('remainingFrequency').textContent = remainingFreq;
+        }
+
+        // 渲染表格
+        function renderTable() {
+            const tbody = document.getElementById('tableBody');
+            let filteredResources = [...resources];
+
+            // 应用状态筛选
+            if (currentFilterType === 'status') {
+                if (currentFilter === 'available') {
+                    filteredResources = filteredResources.filter(r => (r.usedFrequency || 0) < r.frequency);
+                } else if (currentFilter === 'used-up') {
+                    filteredResources = filteredResources.filter(r => (r.usedFrequency || 0) >= r.frequency);
+                }
+            }
+
+            // 应用内容类型筛选
+            if (currentFilterType === 'content' && currentFilter !== 'all') {
+                filteredResources = filteredResources.filter(r =>
+                    r.contentType === currentFilter || r.originalType === currentFilter
+                );
+            }
+
+            // 应用标签筛选
+            if (currentTagFilter) {
+                filteredResources = filteredResources.filter(r =>
+                    r.activityTags && r.activityTags.includes(currentTagFilter)
+                );
+            }
+
+            // 应用媒体类型筛选
+            if (currentMediaTypeFilter) {
+                filteredResources = filteredResources.filter(r =>
+                    r.mediaType === currentMediaTypeFilter
+                );
+            }
+
+            // 应用内容类型筛选
+            if (currentContentTypeFilter) {
+                filteredResources = filteredResources.filter(r =>
+                    r.contentType === currentContentTypeFilter
+                );
+            }
+
+            // 应用发布平台筛选
+            if (currentPlatformFilter) {
+                filteredResources = filteredResources.filter(r =>
+                    r.platform === currentPlatformFilter
+                );
+            }
+
+            // 应用主持人筛选
+            if (currentHostFilter) {
+                filteredResources = filteredResources.filter(r =>
+                    r.hasHost === currentHostFilter
+                );
+            }
+
+            // 应用搜索
+            if (currentSearch) {
+                filteredResources = filteredResources.filter(r =>
+                    r.mediaName.toLowerCase().includes(currentSearch.toLowerCase()) ||
+                    r.mediaType.toLowerCase().includes(currentSearch.toLowerCase()) ||
+                    r.platform.toLowerCase().includes(currentSearch.toLowerCase()) ||
+                    r.agencyCompany.toLowerCase().includes(currentSearch.toLowerCase()) ||
+                    r.detail.toLowerCase().includes(currentSearch.toLowerCase())
+                );
+            }
+
+            // 排序：已用完放下面，其他按媒体名称+媒体类型排序
+            filteredResources.sort((a, b) => {
+                const aUsedUp = (a.usedFrequency || 0) >= a.frequency;
+                const bUsedUp = (b.usedFrequency || 0) >= b.frequency;
+
+                // 已用完的排后面
+                if (aUsedUp && !bUsedUp) return 1;
+                if (!aUsedUp && bUsedUp) return -1;
+
+                // 相同媒体名称排一起
+                if (a.mediaName !== b.mediaName) {
+                    return a.mediaName.localeCompare(b.mediaName, 'zh-CN');
+                }
+
+                // 相同媒体类型排一起
+                return a.mediaType.localeCompare(b.mediaType, 'zh-CN');
+            });
+
+            // 清空表格
+            tbody.innerHTML = '';
+
+            // 如果没有数据
+            if (filteredResources.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="14" class="empty-state">
+                            <h3>暂无数据</h3>
+                            <p>尝试调整筛选条件或添加新的媒体资源</p>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            // 渲染数据
+            filteredResources.forEach((resource, index) => {
+                const usedFrequency = resource.usedFrequency || 0;
+                const remainingFreq = resource.frequency - usedFrequency;
+                const usagePercent = (usedFrequency / resource.frequency * 100).toFixed(0);
+                const remainingCost = calculateRemainingCost(resource);
+                const isUsedUp = usedFrequency >= resource.frequency;
+
+                // 确保activityTags存在
+                if (!resource.activityTags) {
+                    resource.activityTags = [];
+                }
+
+                // 生成活动标签HTML
+                let tagsHtml = '';
+                if (resource.activityTags && resource.activityTags.length > 0) {
+                    tagsHtml = resource.activityTags.map(tag => {
+                        const color = getTagColor(tag);
+                        return `<span class="activity-tag" style="background: ${color}" onclick="viewActivityDetail('${tag}')">
+                            ${tag}
+                            <span class="remove-tag" onclick="event.stopPropagation(); removeTag(${resource.id}, '${tag}')">×</span>
+                        </span>`;
+                    }).join('');
+                } else {
+                    tagsHtml = `<button class="add-tag-btn" onclick="openTagModal(${resource.id})">+ 添加标签</button>`;
+                }
+
+                const row = document.createElement('tr');
+                if (isUsedUp) {
+                    row.classList.add('used-up');
+                }
+
+                row.innerHTML = `
+                    <td>${index + 1}</td>
+                    <td><span class="badge badge-type">${resource.mediaType}</span></td>
+                    <td><strong>${resource.mediaName}</strong></td>
+                    <td>${resource.agencyCompany || '-'}</td>
+                    <td>${resource.originalType}</td>
+                    <td><span class="badge badge-content">${resource.contentType}</span></td>
+                    <td><span class="badge badge-platform">${resource.platform}</span></td>
+                    <td>${resource.detail}</td>
+                    <td class="tags-cell">
+                        ${tagsHtml}
+                    </td>
+                    <td>
+                        <div style="text-align: center;">
+                            <div style="font-size: 14px; margin-bottom: 3px;">${usedFrequency}/${resource.frequency}</div>
+                            <div style="font-size: 13px; color: #666;">剩余${remainingFreq}次</div>
+                        </div>
+                    </td>
+                    <td class="price">¥${parseFloat(resource.singleCost).toLocaleString()}</td>
+                    <td class="price">¥${parseFloat(remainingCost).toLocaleString()}</td>
+                    <td><span class="badge ${resource.hasHost === 'Y' ? 'badge-yes' : 'badge-no'}">${resource.hasHost === 'Y' ? '是' : '否'}</span></td>
+                    <td>
+                        <button class="action-btn" onclick="editResource(${resource.id})">编辑</button>
+                        <button class="action-btn delete-btn" onclick="deleteResource(${resource.id})">删除</button>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+
+            // 更新标签筛选按钮
+            updateTagFilterButtons();
+        }
+
+        // 改变使用频次
+        function changeFrequency(id, change) {
+            const resource = resources.find(r => r.id === id);
+            if (resource) {
+                resource.usedFrequency = (resource.usedFrequency || 0) + change;
+
+                // 确保在有效范围内
+                if (resource.usedFrequency < 0) resource.usedFrequency = 0;
+                if (resource.usedFrequency > resource.frequency) resource.usedFrequency = resource.frequency;
+
+                saveToStorage();
+                renderTable();
+            }
+        }
+
+        // 打开标签模态框
+        function openTagModal(resourceId) {
+            currentTagResourceId = resourceId;
+            document.getElementById('activityNameInput').value = '';
+            document.getElementById('tagModal').style.display = 'block';
+        }
+
+        // 关闭标签模态框
+        function closeTagModal() {
+            document.getElementById('tagModal').style.display = 'none';
+            currentTagResourceId = null;
+        }
+
+        // 保存活动标签
+        function saveActivityTag() {
+            const activityName = document.getElementById('activityNameInput').value.trim();
+            if (!activityName) {
+                alert('请输入活动名称');
+                return;
+            }
+
+            const resource = resources.find(r => r.id === currentTagResourceId);
+            if (resource) {
+                // 确保activityTags数组存在
+                if (!resource.activityTags) {
+                    resource.activityTags = [];
+                }
+
+                // 检查剩余次数
+                const usedFrequency = resource.usedFrequency || 0;
+                const remainingFreq = resource.frequency - usedFrequency;
+                
+                if (remainingFreq <= 0) {
+                    alert('该资源已用完，无法添加更多标签');
+                    closeTagModal();
+                    return;
+                }
+
+                // 添加标签并增加使用频次
+                resource.activityTags.push(activityName);
+                resource.usedFrequency = usedFrequency + 1;
+
+                saveToStorage();
+                renderTable();
+                closeTagModal();
+            }
+        }
+
+        // 移除活动标签
+        function removeTag(resourceId, tagName) {
+            if (!confirm(`确定要删除标签"${tagName}"吗？这将减少1次使用频次。`)) {
+                return;
+            }
+
+            const resource = resources.find(r => r.id === resourceId);
+            if (resource && resource.activityTags) {
+                // 移除标签
+                const tagIndex = resource.activityTags.indexOf(tagName);
+                if (tagIndex > -1) {
+                    resource.activityTags.splice(tagIndex, 1);
+                    // 减少使用频次
+                    resource.usedFrequency = Math.max(0, (resource.usedFrequency || 0) - 1);
+                    saveToStorage();
+                    renderTable();
+                }
+            }
+        }
+
+        // 查看活动详情
+        function viewActivityDetail(activityName) {
+            currentActivityName = activityName;
+            
+            // 筛选包含该标签的资源
+            const activityResources = resources.filter(r => 
+                r.activityTags && r.activityTags.includes(activityName)
+            );
+
+            if (activityResources.length === 0) {
+                alert('该活动暂无关联资源');
+                return;
+            }
+
+            // 计算统计数据
+            const totalCost = activityResources.reduce((sum, r) => sum + r.singleCost, 0);
+            const mediaTypes = [...new Set(activityResources.map(r => r.mediaType))].join(', ');
+
+            // 获取标签信息
+            const tagInfo = tagInfoMap[activityName] || {};
+            const reportUrl = tagInfo.reportUrl;
+
+            // 更新详情页数据
+            document.getElementById('activityDetailName').textContent = activityName;
+            document.getElementById('detailResourceCount').textContent = activityResources.length;
+            document.getElementById('detailTotalCost').textContent = '¥' + totalCost.toLocaleString();
+            document.getElementById('detailMediaTypes').textContent = mediaTypes;
+
+            // 更新传播汇报链接
+            const reportLinkElement = document.getElementById('detailReportLink');
+            if (reportUrl && reportUrl.trim() !== '') {
+                reportLinkElement.innerHTML = `<a href="${reportUrl}" target="_blank" style="color: #546e7a; text-decoration: none; display: inline-flex; align-items: center; gap: 5px;">
+                    📄 查看汇报
+                    <span style="font-size: 12px;">↗</span>
+                </a>`;
+            } else {
+                reportLinkElement.innerHTML = '<span style="color: #999;">-</span>';
+            }
+
+            // 渲染详情表格
+            const detailBody = document.getElementById('activityDetailBody');
+            detailBody.innerHTML = '';
+
+            activityResources.forEach((resource, index) => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${index + 1}</td>
+                    <td><span class="badge badge-type">${resource.mediaType}</span></td>
+                    <td><strong>${resource.mediaName}</strong></td>
+                    <td>${resource.agencyCompany || '-'}</td>
+                    <td>${resource.originalType}</td>
+                    <td><span class="badge badge-content">${resource.contentType}</span></td>
+                    <td><span class="badge badge-platform">${resource.platform}</span></td>
+                    <td>${resource.detail}</td>
+                    <td class="price">¥${parseFloat(resource.singleCost).toLocaleString()}</td>
+                    <td>${resource.hasHost === 'Y' ? '✅' : '❌'}</td>
+                `;
+                detailBody.appendChild(row);
+            });
+
+            // 切换页面
+            document.getElementById('mainView').style.display = 'none';
+            document.getElementById('activityDetailView').classList.add('active');
+        }
+
+        // 返回主列表
+        function backToMain() {
+            document.getElementById('mainView').style.display = 'block';
+            document.getElementById('activityDetailView').classList.remove('active');
+        }
+
+        // 导出活动到Excel
+        function exportActivityToExcel() {
+            if (!currentActivityName) return;
+
+            const activityResources = resources.filter(r => 
+                r.activityTags && r.activityTags.includes(currentActivityName)
+            );
+
+            // 准备导出数据
+            const exportData = activityResources.map((r, index) => ({
+                '序号': index + 1,
+                '媒体类型': r.mediaType,
+                '媒体名称': r.mediaName,
+                '代理公司': r.agencyCompany || '',
+                '原创/供稿': r.originalType,
+                '内容类型': r.contentType,
+                '发布平台': r.platform,
+                '详细资源': r.detail,
+                '资源频次': r.frequency,
+                '单次费用': r.singleCost,
+                '是否可以申请主持人': r.hasHost
+            }));
+
+            // 创建工作簿
+            const ws = XLSX.utils.json_to_sheet(exportData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, currentActivityName.substring(0, 31));
+
+            // 下载文件
+            XLSX.writeFile(wb, `${currentActivityName}_媒体资源.xlsx`);
+        }
+
+        // 打开添加模态框
+        function openAddModal() {
+            editingId = null;
+            document.getElementById('modalTitle').textContent = '添加媒体资源';
+            document.getElementById('resourceForm').reset();
+            document.getElementById('modal').style.display = 'block';
+        }
+
+        // 编辑资源
+        function editResource(id) {
+            const resource = resources.find(r => r.id === id);
+            if (resource) {
+                editingId = id;
+                document.getElementById('modalTitle').textContent = '编辑媒体资源';
+                document.getElementById('mediaType').value = resource.mediaType;
+                document.getElementById('mediaName').value = resource.mediaName;
+                document.getElementById('agencyCompany').value = resource.agencyCompany || '';
+                document.getElementById('originalType').value = resource.originalType;
+                document.getElementById('contentType').value = resource.contentType;
+                document.getElementById('platform').value = resource.platform;
+                document.getElementById('resourceDetail').value = resource.detail;
+                document.getElementById('frequency').value = resource.frequency;
+                document.getElementById('singleCostInput').value = resource.singleCost;
+                document.getElementById('hasHost').value = resource.hasHost;
+                document.getElementById('modal').style.display = 'block';
+            }
+        }
+
+        // 删除资源
+        function deleteResource(id) {
+            if (confirm('确定要删除这个媒体资源吗？')) {
+                resources = resources.filter(r => r.id !== id);
+                saveToStorage();
+                renderTable();
+            }
+        }
+
+        // 关闭模态框
+        function closeModal() {
+            document.getElementById('modal').style.display = 'none';
+            editingId = null;
+        }
+
+        // 表单提交
+        document.getElementById('resourceForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+
+            const singleCost = parseFloat(document.getElementById('singleCostInput').value);
+            const frequency = parseInt(document.getElementById('frequency').value);
+            
+            const formData = {
+                mediaType: document.getElementById('mediaType').value,
+                mediaName: document.getElementById('mediaName').value,
+                agencyCompany: document.getElementById('agencyCompany').value,
+                originalType: document.getElementById('originalType').value,
+                contentType: document.getElementById('contentType').value,
+                platform: document.getElementById('platform').value,
+                detail: document.getElementById('resourceDetail').value,
+                frequency: frequency,
+                singleCost: singleCost,
+                totalCost: singleCost * frequency,
+                hasHost: document.getElementById('hasHost').value
+            };
+
+            if (editingId) {
+                // 编辑现有资源
+                const resource = resources.find(r => r.id === editingId);
+                if (resource) {
+                    Object.assign(resource, formData);
+                    // 保留已使用频次和活动标签
+                    if (!resource.usedFrequency) resource.usedFrequency = 0;
+                    if (!resource.activityTags) resource.activityTags = [];
+                }
+            } else {
+                // 添加新资源
+                const newResource = {
+                    id: Date.now(),
+                    ...formData,
+                    usedFrequency: 0,
+                    activityTags: []
+                };
+                resources.push(newResource);
+            }
+
+            saveToStorage();
+            renderTable();
+            closeModal();
+        });
+
+        // 搜索功能
+        document.getElementById('searchInput').addEventListener('input', function(e) {
+            currentSearch = e.target.value;
+            renderTable();
+        });
+
+        // 筛选按钮
+        document.querySelectorAll('.filter-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const filterType = this.dataset.type || 'status';
+                const filterValue = this.dataset.filter;
+
+                // 清除同类型其他按钮的active状态
+                document.querySelectorAll(`[data-type="${filterType}"]`).forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+                currentFilter = filterValue;
+                currentFilterType = filterType;
+
+                renderTable();
+            });
+        });
+
+        // 更新标签筛选按钮
+        function updateTagFilterButtons() {
+            const dropdown = document.getElementById('tagFilterDropdown');
+            if (!dropdown) return;
+
+            // 获取所有标签
+            const allTags = new Set();
+            resources.forEach(r => {
+                if (r.activityTags) {
+                    r.activityTags.forEach(tag => allTags.add(tag));
+                }
+            });
+
+            // 生成下拉菜单内容
+            let html = '<div style="margin-bottom: 8px; font-weight: 600; color: #666;">选择标签筛选：</div>';
+
+            // 添加"全部"选项
+            html += `<div style="padding: 8px; cursor: pointer; border-radius: 4px; ${!currentTagFilter ? 'background: #546e7a; color: white;' : 'hover:background: #f0f0f0;'}"
+                onclick="filterByTag(null, event)">
+                ${!currentTagFilter ? '✓ ' : ''}全部标签
+            </div>`;
+
+            if (allTags.size > 0) {
+                allTags.forEach(tag => {
+                    const isActive = currentTagFilter === tag;
+                    html += `<div style="padding: 8px; cursor: pointer; border-radius: 4px; ${isActive ? 'background: #546e7a; color: white;' : ''}"
+                        onmouseover="if(!this.style.color) this.style.background='#f0f0f0'"
+                        onmouseout="if(!this.style.color) this.style.background=''"
+                        onclick="filterByTag('${tag}', event)">
+                        ${isActive ? '✓ ' : ''}${tag}
+                    </div>`;
+                });
+            } else {
+                html += '<div style="padding: 8px; color: #999;">暂无标签</div>';
+            }
+
+            dropdown.innerHTML = html;
+        }
+
+        // 切换标签筛选下拉菜单
+        function toggleTagFilter(event) {
+            event.stopPropagation();
+            const dropdown = document.getElementById('tagFilterDropdown');
+            if (dropdown.style.display === 'none') {
+                dropdown.style.display = 'block';
+                updateTagFilterButtons();
+            } else {
+                dropdown.style.display = 'none';
+            }
+        }
+
+        // 按标签筛选
+        function filterByTag(tagName, event) {
+            event.stopPropagation();
+            currentTagFilter = tagName;
+            renderTable();
+            document.getElementById('tagFilterDropdown').style.display = 'none';
+        }
+
+        // === 媒体类型筛选 ===
+        function updateMediaTypeFilterButtons() {
+            const dropdown = document.getElementById('mediaTypeFilterDropdown');
+            if (!dropdown) return;
+
+            const allTypes = new Set();
+            resources.forEach(r => {
+                if (r.mediaType) {
+                    allTypes.add(r.mediaType);
+                }
+            });
+
+            let html = '<div style="margin-bottom: 8px; font-weight: 600; color: #666;">选择媒体类型筛选：</div>';
+            html += `<div style="padding: 8px; cursor: pointer; border-radius: 4px; ${!currentMediaTypeFilter ? 'background: #546e7a; color: white;' : ''}"
+                onclick="filterByMediaType(null, event)">
+                ${!currentMediaTypeFilter ? '✓ ' : ''}全部类型
+            </div>`;
+
+            if (allTypes.size > 0) {
+                Array.from(allTypes).sort().forEach(type => {
+                    const isActive = currentMediaTypeFilter === type;
+                    html += `<div style="padding: 8px; cursor: pointer; border-radius: 4px; ${isActive ? 'background: #546e7a; color: white;' : ''}"
+                        onmouseover="if(!this.style.color) this.style.background='#f0f0f0'"
+                        onmouseout="if(!this.style.color) this.style.background=''"
+                        onclick="filterByMediaType('${type}', event)">
+                        ${isActive ? '✓ ' : ''}${type}
+                    </div>`;
+                });
+            }
+
+            dropdown.innerHTML = html;
+        }
+
+        function toggleMediaTypeFilter(event) {
+            event.stopPropagation();
+            const dropdown = document.getElementById('mediaTypeFilterDropdown');
+            if (dropdown.style.display === 'none') {
+                dropdown.style.display = 'block';
+                updateMediaTypeFilterButtons();
+            } else {
+                dropdown.style.display = 'none';
+            }
+        }
+
+        function filterByMediaType(type, event) {
+            event.stopPropagation();
+            currentMediaTypeFilter = type;
+            renderTable();
+            document.getElementById('mediaTypeFilterDropdown').style.display = 'none';
+        }
+
+        // === 内容类型筛选 ===
+        function updateContentTypeFilterButtons() {
+            const dropdown = document.getElementById('contentTypeFilterDropdown');
+            if (!dropdown) return;
+
+            const allTypes = new Set();
+            resources.forEach(r => {
+                if (r.contentType) {
+                    allTypes.add(r.contentType);
+                }
+            });
+
+            let html = '<div style="margin-bottom: 8px; font-weight: 600; color: #666;">选择内容类型筛选：</div>';
+            html += `<div style="padding: 8px; cursor: pointer; border-radius: 4px; ${!currentContentTypeFilter ? 'background: #546e7a; color: white;' : ''}"
+                onclick="filterByContentType(null, event)">
+                ${!currentContentTypeFilter ? '✓ ' : ''}全部类型
+            </div>`;
+
+            if (allTypes.size > 0) {
+                Array.from(allTypes).sort().forEach(type => {
+                    const isActive = currentContentTypeFilter === type;
+                    html += `<div style="padding: 8px; cursor: pointer; border-radius: 4px; ${isActive ? 'background: #546e7a; color: white;' : ''}"
+                        onmouseover="if(!this.style.color) this.style.background='#f0f0f0'"
+                        onmouseout="if(!this.style.color) this.style.background=''"
+                        onclick="filterByContentType('${type}', event)">
+                        ${isActive ? '✓ ' : ''}${type}
+                    </div>`;
+                });
+            }
+
+            dropdown.innerHTML = html;
+        }
+
+        function toggleContentTypeFilter(event) {
+            event.stopPropagation();
+            const dropdown = document.getElementById('contentTypeFilterDropdown');
+            if (dropdown.style.display === 'none') {
+                dropdown.style.display = 'block';
+                updateContentTypeFilterButtons();
+            } else {
+                dropdown.style.display = 'none';
+            }
+        }
+
+        function filterByContentType(type, event) {
+            event.stopPropagation();
+            currentContentTypeFilter = type;
+            renderTable();
+            document.getElementById('contentTypeFilterDropdown').style.display = 'none';
+        }
+
+        // === 发布平台筛选 ===
+        function updatePlatformFilterButtons() {
+            const dropdown = document.getElementById('platformFilterDropdown');
+            if (!dropdown) return;
+
+            const allPlatforms = new Set();
+            resources.forEach(r => {
+                if (r.platform) {
+                    allPlatforms.add(r.platform);
+                }
+            });
+
+            let html = '<div style="margin-bottom: 8px; font-weight: 600; color: #666;">选择发布平台筛选：</div>';
+            html += `<div style="padding: 8px; cursor: pointer; border-radius: 4px; ${!currentPlatformFilter ? 'background: #546e7a; color: white;' : ''}"
+                onclick="filterByPlatform(null, event)">
+                ${!currentPlatformFilter ? '✓ ' : ''}全部平台
+            </div>`;
+
+            if (allPlatforms.size > 0) {
+                Array.from(allPlatforms).sort().forEach(platform => {
+                    const isActive = currentPlatformFilter === platform;
+                    html += `<div style="padding: 8px; cursor: pointer; border-radius: 4px; ${isActive ? 'background: #546e7a; color: white;' : ''}"
+                        onmouseover="if(!this.style.color) this.style.background='#f0f0f0'"
+                        onmouseout="if(!this.style.color) this.style.background=''"
+                        onclick="filterByPlatform('${platform}', event)">
+                        ${isActive ? '✓ ' : ''}${platform}
+                    </div>`;
+                });
+            }
+
+            dropdown.innerHTML = html;
+        }
+
+        function togglePlatformFilter(event) {
+            event.stopPropagation();
+            const dropdown = document.getElementById('platformFilterDropdown');
+            if (dropdown.style.display === 'none') {
+                dropdown.style.display = 'block';
+                updatePlatformFilterButtons();
+            } else {
+                dropdown.style.display = 'none';
+            }
+        }
+
+        function filterByPlatform(platform, event) {
+            event.stopPropagation();
+            currentPlatformFilter = platform;
+            renderTable();
+            document.getElementById('platformFilterDropdown').style.display = 'none';
+        }
+
+        // === 主持人筛选 ===
+        function updateHostFilterButtons() {
+            const dropdown = document.getElementById('hostFilterDropdown');
+            if (!dropdown) return;
+
+            let html = '<div style="margin-bottom: 8px; font-weight: 600; color: #666;">选择主持人筛选：</div>';
+            html += `<div style="padding: 8px; cursor: pointer; border-radius: 4px; ${!currentHostFilter ? 'background: #546e7a; color: white;' : ''}"
+                onclick="filterByHost(null, event)">
+                ${!currentHostFilter ? '✓ ' : ''}全部
+            </div>`;
+
+            html += `<div style="padding: 8px; cursor: pointer; border-radius: 4px; ${currentHostFilter === 'Y' ? 'background: #546e7a; color: white;' : ''}"
+                onmouseover="if(!this.style.color) this.style.background='#f0f0f0'"
+                onmouseout="if(!this.style.color) this.style.background=''"
+                onclick="filterByHost('Y', event)">
+                ${currentHostFilter === 'Y' ? '✓ ' : ''}有主持人
+            </div>`;
+
+            html += `<div style="padding: 8px; cursor: pointer; border-radius: 4px; ${currentHostFilter === 'N' ? 'background: #546e7a; color: white;' : ''}"
+                onmouseover="if(!this.style.color) this.style.background='#f0f0f0'"
+                onmouseout="if(!this.style.color) this.style.background=''"
+                onclick="filterByHost('N', event)">
+                ${currentHostFilter === 'N' ? '✓ ' : ''}无主持人
+            </div>`;
+
+            dropdown.innerHTML = html;
+        }
+
+        function toggleHostFilter(event) {
+            event.stopPropagation();
+            const dropdown = document.getElementById('hostFilterDropdown');
+            if (dropdown.style.display === 'none') {
+                dropdown.style.display = 'block';
+                updateHostFilterButtons();
+            } else {
+                dropdown.style.display = 'none';
+            }
+        }
+
+        function filterByHost(hasHost, event) {
+            event.stopPropagation();
+            currentHostFilter = hasHost;
+            renderTable();
+            document.getElementById('hostFilterDropdown').style.display = 'none';
+        }
+
+        // 点击外部关闭下拉菜单
+        document.addEventListener('click', function(event) {
+            const dropdowns = [
+                'tagFilterDropdown',
+                'mediaTypeFilterDropdown',
+                'contentTypeFilterDropdown',
+                'platformFilterDropdown',
+                'hostFilterDropdown',
+                'summaryTagNameFilterDropdown',
+                'summaryDirectionFilterDropdown',
+                'summaryTimeFilterDropdown'
+            ];
+
+            dropdowns.forEach(id => {
+                const dropdown = document.getElementById(id);
+                if (dropdown && dropdown.style.display === 'block') {
+                    dropdown.style.display = 'none';
+                }
+            });
+        });
+
+        // 打开标签汇总页面
+        function openTagSummaryPage() {
+            document.getElementById('mainView').style.display = 'none';
+            document.getElementById('tagSummaryView').style.display = 'block';
+            document.getElementById('activityDetailView').style.display = 'none';
+            renderTagSummary();
+        }
+
+        // 返回主页面（从标签汇总）
+        function backToMainFromSummary() {
+            document.getElementById('mainView').style.display = 'block';
+            document.getElementById('tagSummaryView').style.display = 'none';
+            renderTable();
+        }
+
+        // === 标签汇总页面筛选功能 ===
+
+        // 更新项目名称筛选按钮
+        function updateSummaryTagNameFilterButtons() {
+            const dropdown = document.getElementById('summaryTagNameFilterDropdown');
+            if (!dropdown) return;
+
+            const allTags = new Set();
+            resources.forEach(r => {
+                if (r.activityTags && r.activityTags.length > 0) {
+                    r.activityTags.forEach(tag => allTags.add(tag));
+                }
+            });
+
+            let html = '<div style="margin-bottom: 8px; font-weight: 600; color: #666;">选择项目名称筛选：</div>';
+            html += `<div style="padding: 8px; cursor: pointer; border-radius: 4px; ${!currentSummaryTagNameFilter ? 'background: #546e7a; color: white;' : ''}"
+                onclick="filterBySummaryTagName(null, event)">
+                ${!currentSummaryTagNameFilter ? '✓ ' : ''}全部项目
+            </div>`;
+
+            if (allTags.size > 0) {
+                Array.from(allTags).sort().forEach(tag => {
+                    const isActive = currentSummaryTagNameFilter === tag;
+                    html += `<div style="padding: 8px; cursor: pointer; border-radius: 4px; ${isActive ? 'background: #546e7a; color: white;' : ''}"
+                        onmouseover="if(!this.style.color) this.style.background='#f0f0f0'"
+                        onmouseout="if(!this.style.color) this.style.background=''"
+                        onclick="filterBySummaryTagName('${tag}', event)">
+                        ${isActive ? '✓ ' : ''}${tag}
+                    </div>`;
+                });
+            }
+
+            dropdown.innerHTML = html;
+        }
+
+        function toggleSummaryTagNameFilter(event) {
+            event.stopPropagation();
+            const dropdown = document.getElementById('summaryTagNameFilterDropdown');
+            if (dropdown.style.display === 'none') {
+                dropdown.style.display = 'block';
+                updateSummaryTagNameFilterButtons();
+            } else {
+                dropdown.style.display = 'none';
+            }
+        }
+
+        function filterBySummaryTagName(tagName, event) {
+            event.stopPropagation();
+            currentSummaryTagNameFilter = tagName;
+            renderTagSummary();
+            document.getElementById('summaryTagNameFilterDropdown').style.display = 'none';
+        }
+
+        // 更新传播方向筛选按钮
+        function updateSummaryDirectionFilterButtons() {
+            const dropdown = document.getElementById('summaryDirectionFilterDropdown');
+            if (!dropdown) return;
+
+            const allDirections = new Set();
+            Object.keys(tagInfoMap).forEach(tag => {
+                if (tagInfoMap[tag].direction) {
+                    allDirections.add(tagInfoMap[tag].direction);
+                }
+            });
+
+            let html = '<div style="margin-bottom: 8px; font-weight: 600; color: #666;">选择传播方向筛选：</div>';
+            html += `<div style="padding: 8px; cursor: pointer; border-radius: 4px; ${!currentSummaryDirectionFilter ? 'background: #546e7a; color: white;' : ''}"
+                onclick="filterBySummaryDirection(null, event)">
+                ${!currentSummaryDirectionFilter ? '✓ ' : ''}全部方向
+            </div>`;
+
+            if (allDirections.size > 0) {
+                Array.from(allDirections).sort().forEach(direction => {
+                    const isActive = currentSummaryDirectionFilter === direction;
+                    html += `<div style="padding: 8px; cursor: pointer; border-radius: 4px; ${isActive ? 'background: #546e7a; color: white;' : ''}"
+                        onmouseover="if(!this.style.color) this.style.background='#f0f0f0'"
+                        onmouseout="if(!this.style.color) this.style.background=''"
+                        onclick="filterBySummaryDirection('${direction}', event)">
+                        ${isActive ? '✓ ' : ''}${direction}
+                    </div>`;
+                });
+            } else {
+                html += '<div style="padding: 8px; color: #999;">暂无数据</div>';
+            }
+
+            dropdown.innerHTML = html;
+        }
+
+        function toggleSummaryDirectionFilter(event) {
+            event.stopPropagation();
+            const dropdown = document.getElementById('summaryDirectionFilterDropdown');
+            if (dropdown.style.display === 'none') {
+                dropdown.style.display = 'block';
+                updateSummaryDirectionFilterButtons();
+            } else {
+                dropdown.style.display = 'none';
+            }
+        }
+
+        function filterBySummaryDirection(direction, event) {
+            event.stopPropagation();
+            currentSummaryDirectionFilter = direction;
+            renderTagSummary();
+            document.getElementById('summaryDirectionFilterDropdown').style.display = 'none';
+        }
+
+        // 更新使用时间筛选按钮
+        function updateSummaryTimeFilterButtons() {
+            const dropdown = document.getElementById('summaryTimeFilterDropdown');
+            if (!dropdown) return;
+
+            const allTimes = new Set();
+            Object.keys(tagInfoMap).forEach(tag => {
+                if (tagInfoMap[tag].usageTime) {
+                    allTimes.add(tagInfoMap[tag].usageTime);
+                }
+            });
+
+            let html = '<div style="margin-bottom: 8px; font-weight: 600; color: #666;">选择使用时间筛选：</div>';
+            html += `<div style="padding: 8px; cursor: pointer; border-radius: 4px; ${!currentSummaryTimeFilter ? 'background: #546e7a; color: white;' : ''}"
+                onclick="filterBySummaryTime(null, event)">
+                ${!currentSummaryTimeFilter ? '✓ ' : ''}全部时间
+            </div>`;
+
+            if (allTimes.size > 0) {
+                Array.from(allTimes).sort().forEach(time => {
+                    const isActive = currentSummaryTimeFilter === time;
+                    html += `<div style="padding: 8px; cursor: pointer; border-radius: 4px; ${isActive ? 'background: #546e7a; color: white;' : ''}"
+                        onmouseover="if(!this.style.color) this.style.background='#f0f0f0'"
+                        onmouseout="if(!this.style.color) this.style.background=''"
+                        onclick="filterBySummaryTime('${time}', event)">
+                        ${isActive ? '✓ ' : ''}${time}
+                    </div>`;
+                });
+            } else {
+                html += '<div style="padding: 8px; color: #999;">暂无数据</div>';
+            }
+
+            dropdown.innerHTML = html;
+        }
+
+        function toggleSummaryTimeFilter(event) {
+            event.stopPropagation();
+            const dropdown = document.getElementById('summaryTimeFilterDropdown');
+            if (dropdown.style.display === 'none') {
+                dropdown.style.display = 'block';
+                updateSummaryTimeFilterButtons();
+            } else {
+                dropdown.style.display = 'none';
+            }
+        }
+
+        function filterBySummaryTime(time, event) {
+            event.stopPropagation();
+            currentSummaryTimeFilter = time;
+            renderTagSummary();
+            document.getElementById('summaryTimeFilterDropdown').style.display = 'none';
+        }
+
+        // 处理标签汇总搜索
+        function handleSummarySearch(searchText) {
+            currentSummarySearch = searchText;
+            renderTagSummary();
+        }
+
+        // 渲染标签汇总表格
+        function renderTagSummary() {
+            const tbody = document.getElementById('tagSummaryBody');
+
+            // 按标签汇总数据
+            const tagSummary = {};
+            resources.forEach(r => {
+                if (r.activityTags && r.activityTags.length > 0) {
+                    r.activityTags.forEach(tag => {
+                        if (!tagSummary[tag]) {
+                            tagSummary[tag] = {
+                                tagName: tag,
+                                totalCost: 0,
+                                mediaCount: 0,
+                                mediaNames: new Set()
+                            };
+                        }
+
+                        // 累加费用（只计算已使用部分）
+                        const usedFrequency = r.usedFrequency || 0;
+                        tagSummary[tag].totalCost += r.singleCost * usedFrequency;
+
+                        // 统计媒体数
+                        tagSummary[tag].mediaNames.add(r.mediaName);
+                    });
+                }
+            });
+
+            // 转换为数组并排序
+            const summaryArray = Object.values(tagSummary).map(item => ({
+                ...item,
+                mediaCount: item.mediaNames.size
+            }));
+
+            // 应用筛选
+            let filteredSummary = [...summaryArray];
+
+            // 应用项目名称筛选
+            if (currentSummaryTagNameFilter) {
+                filteredSummary = filteredSummary.filter(item =>
+                    item.tagName === currentSummaryTagNameFilter
+                );
+            }
+
+            // 应用传播方向筛选
+            if (currentSummaryDirectionFilter) {
+                filteredSummary = filteredSummary.filter(item => {
+                    const tagInfo = tagInfoMap[item.tagName] || {};
+                    return tagInfo.direction === currentSummaryDirectionFilter;
+                });
+            }
+
+            // 应用使用时间筛选
+            if (currentSummaryTimeFilter) {
+                filteredSummary = filteredSummary.filter(item => {
+                    const tagInfo = tagInfoMap[item.tagName] || {};
+                    return tagInfo.usageTime === currentSummaryTimeFilter;
+                });
+            }
+
+            // 应用搜索
+            if (currentSummarySearch && currentSummarySearch.trim() !== '') {
+                const searchLower = currentSummarySearch.toLowerCase();
+                filteredSummary = filteredSummary.filter(item => {
+                    const tagInfo = tagInfoMap[item.tagName] || {};
+                    return (
+                        item.tagName.toLowerCase().includes(searchLower) ||
+                        (tagInfo.direction && tagInfo.direction.toLowerCase().includes(searchLower)) ||
+                        (tagInfo.usageTime && tagInfo.usageTime.toLowerCase().includes(searchLower)) ||
+                        (tagInfo.remarks && tagInfo.remarks.toLowerCase().includes(searchLower))
+                    );
+                });
+            }
+
+            // 清空表格
+            tbody.innerHTML = '';
+
+            if (filteredSummary.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="8" class="empty-state">
+                            <h3>暂无符合条件的数据</h3>
+                            <p>请调整筛选条件或添加标签</p>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            // 渲染数据
+            filteredSummary.forEach((item, index) => {
+                const tagInfo = tagInfoMap[item.tagName] || {};
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${index + 1}</td>
+                    <td><strong>${item.tagName}</strong></td>
+                    <td class="price">¥${item.totalCost.toLocaleString('zh-CN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                    <td>${item.mediaCount}家</td>
+                    <td>${tagInfo.direction || '-'}</td>
+                    <td>${tagInfo.usageTime || '-'}</td>
+                    <td>${tagInfo.remarks || '-'}</td>
+                    <td>
+                        <button class="action-btn" onclick="editTagInfo('${item.tagName}')">编辑</button>
+                        <button class="action-btn" onclick="viewActivityDetail('${item.tagName}')">查看详情</button>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        // 编辑标签信息
+        function editTagInfo(tagName) {
+            currentEditingTag = tagName;
+            const tagInfo = tagInfoMap[tagName] || {};
+
+            document.getElementById('tagNameDisplay').value = tagName;
+            document.getElementById('tagDirection').value = tagInfo.direction || '';
+            document.getElementById('tagUsageTime').value = tagInfo.usageTime || '';
+            document.getElementById('tagReportUrl').value = tagInfo.reportUrl || '';
+            document.getElementById('tagRemarks').value = tagInfo.remarks || '';
+
+            document.getElementById('editTagInfoModal').style.display = 'block';
+        }
+
+        // 关闭编辑标签信息模态框
+        function closeEditTagInfoModal() {
+            document.getElementById('editTagInfoModal').style.display = 'none';
+            currentEditingTag = null;
+        }
+
+        // 保存标签信息
+        document.getElementById('tagInfoForm')?.addEventListener('submit', async function(e) {
+            e.preventDefault();
+
+            if (!currentEditingTag) return;
+
+            tagInfoMap[currentEditingTag] = {
+                direction: document.getElementById('tagDirection').value,
+                usageTime: document.getElementById('tagUsageTime').value,
+                reportUrl: document.getElementById('tagReportUrl').value,
+                remarks: document.getElementById('tagRemarks').value
+            };
+
+            await saveToStorage();
+            closeEditTagInfoModal();
+            renderTagSummary();
+        });
+
+        // 点击模态框外部关闭（更新）
+        window.addEventListener('click', function(e) {
+            const modal = document.getElementById('modal');
+            const tagModal = document.getElementById('tagModal');
+            const editTagInfoModal = document.getElementById('editTagInfoModal');
+
+            if (e.target === modal) {
+                closeModal();
+            }
+            if (e.target === tagModal) {
+                closeTagModal();
+            }
+            if (e.target === editTagInfoModal) {
+                closeEditTagInfoModal();
+            }
+        });
+
+        // 导出数据备份功能
+        async function exportData() {
+            try {
+                let dataToExport;
+
+                if (firebaseReady) {
+                    // 从Firebase读取最新数据
+                    const snapshot = await db.collection(COLLECTION_RESOURCES).get();
+                    dataToExport = snapshot.docs.map(doc => doc.data());
+                    console.log('📥 从Firebase读取数据');
+                } else {
+                    // 使用本地数据
+                    dataToExport = resources;
+                    console.log('📥 使用本地数据');
+                }
+
+                // 创建备份对象
+                const backup = {
+                    version: '1.0',
+                    exportDate: new Date().toISOString(),
+                    exportTime: new Date().toLocaleString('zh-CN'),
+                    resourceCount: dataToExport.length,
+                    taggedCount: dataToExport.filter(r => r.activityTags && r.activityTags.length > 0).length,
+                    tagColorMap: tagColorMap,
+                    resources: dataToExport
+                };
+
+                // 生成文件名
+                const timestamp = new Date().toISOString().replace(/[:.]/g, '-').substring(0, 19);
+                const filename = `媒体资源备份_${timestamp}.json`;
+
+                // 创建下载链接
+                const dataStr = JSON.stringify(backup, null, 2);
+                const dataBlob = new Blob([dataStr], { type: 'application/json' });
+                const url = URL.createObjectURL(dataBlob);
+
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = filename;
+                link.click();
+
+                URL.revokeObjectURL(url);
+
+                alert(`✅ 备份导出成功！\n\n文件名：${filename}\n资源总数：${backup.resourceCount}\n已打标签：${backup.taggedCount}\n导出时间：${backup.exportTime}`);
+
+            } catch (error) {
+                console.error('❌ 导出失败:', error);
+                alert('导出失败：' + error.message);
+            }
+        }
+
+        // 导入数据备份功能
+        async function importData(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            try {
+                const text = await file.text();
+                const backup = JSON.parse(text);
+
+                // 验证备份格式
+                if (!backup.resources || !Array.isArray(backup.resources)) {
+                    alert('❌ 备份文件格式错误');
+                    return;
+                }
+
+                const message = `确定要导入备份吗？\n\n备份信息：\n- 导出时间：${backup.exportTime || '未知'}\n- 资源总数：${backup.resourceCount || backup.resources.length}\n- 已打标签：${backup.taggedCount || 0}\n\n⚠️ 警告：这将覆盖当前所有数据！`;
+
+                if (!confirm(message)) {
+                    event.target.value = ''; // 重置文件输入
+                    return;
+                }
+
+                // 恢复标签颜色
+                if (backup.tagColorMap) {
+                    Object.assign(tagColorMap, backup.tagColorMap);
+                }
+
+                if (firebaseReady) {
+                    // 上传到Firebase
+                    console.log('📤 正在导入数据到Firebase...');
+
+                    // 先清空现有数据
+                    const snapshot = await db.collection(COLLECTION_RESOURCES).get();
+                    const batch1 = db.batch();
+                    snapshot.docs.forEach(doc => {
+                        batch1.delete(doc.ref);
+                    });
+                    await batch1.commit();
+
+                    // 上传备份数据
+                    const batchSize = 500;
+                    for (let i = 0; i < backup.resources.length; i += batchSize) {
+                        const batch2 = db.batch();
+                        const chunk = backup.resources.slice(i, i + batchSize);
+                        chunk.forEach(resource => {
+                            const docRef = db.collection(COLLECTION_RESOURCES).doc();
+                            // 移除可能存在的firestoreId字段
+                            const { firestoreId, ...cleanResource } = resource;
+                            batch2.set(docRef, cleanResource);
+                        });
+                        await batch2.commit();
+                    }
+
+                    // 保存标签颜色
+                    const colorMapRef = db.collection(COLLECTION_CONFIG).doc('tagColorMap');
+                    await colorMapRef.set({ colors: tagColorMap }, { merge: true });
+
+                    alert(`✅ 数据导入成功！\n\n已导入 ${backup.resources.length} 条资源\n其中 ${backup.resources.filter(r => r.activityTags && r.activityTags.length > 0).length} 条有标签`);
+                } else {
+                    // 仅恢复到本地
+                    resources = backup.resources;
+                    saveToStorage();
+                    renderTable();
+                    updateStats();
+                    alert(`✅ 数据已导入到本地！\n\n已导入 ${backup.resources.length} 条资源\n（Firebase未连接，仅导入到本地）`);
+                }
+
+                // 重置文件输入
+                event.target.value = '';
+
+            } catch (error) {
+                console.error('❌ 导入失败:', error);
+                alert('导入失败：' + error.message);
+                event.target.value = '';
+            }
+        }
+
+        // 批量导入资源功能（支持JSON/CSV）
+        async function batchImportData(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            try {
+                const fileName = file.name.toLowerCase();
+                let newResources = [];
+
+                if (fileName.endsWith('.json')) {
+                    // 处理JSON格式
+                    const text = await file.text();
+                    const data = JSON.parse(text);
+
+                    // 判断是完整备份还是纯资源数组
+                    if (data.resources && Array.isArray(data.resources)) {
+                        newResources = data.resources;
+                    } else if (Array.isArray(data)) {
+                        newResources = data;
+                    } else {
+                        alert('❌ JSON格式错误\n\n需要是资源数组或包含resources字段的对象');
+                        event.target.value = '';
+                        return;
+                    }
+
+                } else if (fileName.endsWith('.csv')) {
+                    // 处理CSV格式
+                    const text = await file.text();
+                    newResources = parseCSV(text);
+
+                } else if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
+                    alert('⚠️ Excel文件暂不支持直接导入\n\n请先在Excel中"另存为CSV格式"，然后导入CSV文件。');
+                    event.target.value = '';
+                    return;
+
+                } else {
+                    alert('❌ 不支持的文件格式\n\n支持格式：JSON、CSV');
+                    event.target.value = '';
+                    return;
+                }
+
+                // 验证数据格式
+                if (newResources.length === 0) {
+                    alert('❌ 文件中没有有效数据');
+                    event.target.value = '';
+                    return;
+                }
+
+                // 检查必填字段
+                const requiredFields = ['mediaName', 'mediaType'];
+                const hasRequiredFields = newResources.every(r =>
+                    requiredFields.every(field => r[field])
+                );
+
+                if (!hasRequiredFields) {
+                    alert('❌ 数据格式错误\n\n每条资源必须包含：媒体名称(mediaName)、媒体类型(mediaType)');
+                    event.target.value = '';
+                    return;
+                }
+
+                // 询问导入方式
+                const mode = confirm(
+                    `📋 发现 ${newResources.length} 条新资源\n\n` +
+                    `点击"确定"：追加到现有数据（推荐）\n` +
+                    `点击"取消"：替换所有现有数据`
+                );
+
+                if (mode) {
+                    // 追加模式：为新资源分配ID
+                    const maxId = resources.length > 0 ? Math.max(...resources.map(r => r.id || 0)) : 0;
+                    newResources.forEach((r, index) => {
+                        if (!r.id) r.id = maxId + index + 1;
+                        if (!r.activityTags) r.activityTags = [];
+                        if (!r.usedFrequency) r.usedFrequency = 0;
+                        if (!r.hasHost) r.hasHost = 'N';
+                        // 确保必需字段有默认值
+                        if (!r.frequency) r.frequency = 1;
+                        if (!r.totalCost) r.totalCost = 0;
+                        if (!r.singleCost) r.singleCost = 0;
+                    });
+                    resources.push(...newResources);
+
+                } else {
+                    // 替换模式
+                    const confirmReplace = confirm(
+                        `⚠️ 确认要替换吗？\n\n这将删除当前所有 ${resources.length} 条资源，\n用新的 ${newResources.length} 条资源替换！`
+                    );
+                    if (!confirmReplace) {
+                        event.target.value = '';
+                        return;
+                    }
+
+                    // 为新资源分配ID和默认值
+                    newResources.forEach((r, index) => {
+                        if (!r.id) r.id = index + 1;
+                        if (!r.activityTags) r.activityTags = [];
+                        if (!r.usedFrequency) r.usedFrequency = 0;
+                        if (!r.hasHost) r.hasHost = 'N';
+                        if (!r.frequency) r.frequency = 1;
+                        if (!r.totalCost) r.totalCost = 0;
+                        if (!r.singleCost) r.singleCost = 0;
+                    });
+                    resources = newResources;
+                }
+
+                // 保存到Firebase或本地
+                if (firebaseReady) {
+                    console.log('📤 正在上传数据到Firebase...');
+
+                    if (!mode) {
+                        // 替换模式：先清空
+                        const snapshot = await db.collection(COLLECTION_RESOURCES).get();
+                        const batch1 = db.batch();
+                        snapshot.docs.forEach(doc => {
+                            batch1.delete(doc.ref);
+                        });
+                        await batch1.commit();
+                    }
+
+                    // 上传新数据
+                    const batchSize = 500;
+                    for (let i = 0; i < resources.length; i += batchSize) {
+                        const batch2 = db.batch();
+                        const chunk = resources.slice(i, i + batchSize);
+                        chunk.forEach(resource => {
+                            if (!mode || !resource.firestoreId) {
+                                // 追加模式下的新资源，或替换模式下的所有资源
+                                const docRef = db.collection(COLLECTION_RESOURCES).doc();
+                                const { firestoreId, ...cleanResource } = resource;
+                                batch2.set(docRef, cleanResource);
+                            }
+                        });
+                        await batch2.commit();
+                    }
+
+                    alert(`✅ 批量导入成功！\n\n${mode ? '已追加' : '已替换'} ${newResources.length} 条资源`);
+                } else {
+                    saveToStorage();
+                    renderTable();
+                    updateStats();
+                    alert(`✅ 批量导入成功！\n\n${mode ? '已追加' : '已替换'} ${newResources.length} 条资源\n（Firebase未连接，仅保存到本地）`);
+                }
+
+                event.target.value = '';
+
+            } catch (error) {
+                console.error('❌ 批量导入失败:', error);
+                alert('批量导入失败：' + error.message);
+                event.target.value = '';
+            }
+        }
+
+        // 解析CSV文件
+        function parseCSV(text) {
+            const lines = text.trim().split('\n');
+            if (lines.length < 2) return [];
+
+            // 解析表头
+            const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
+
+            // 字段映射（支持中英文字段名）
+            const fieldMap = {
+                '媒体名称': 'mediaName',
+                'mediaName': 'mediaName',
+                '媒体类型': 'mediaType',
+                'mediaType': 'mediaType',
+                '代理公司': 'agencyCompany',
+                'agencyCompany': 'agencyCompany',
+                '原创/供稿': 'originalType',
+                'originalType': 'originalType',
+                '内容类型': 'contentType',
+                'contentType': 'contentType',
+                '发布平台': 'platform',
+                'platform': 'platform',
+                '详细资源': 'detail',
+                'detail': 'detail',
+                '频次': 'frequency',
+                'frequency': 'frequency',
+                '总费用': 'totalCost',
+                'totalCost': 'totalCost',
+                '单次费用': 'singleCost',
+                'singleCost': 'singleCost',
+                '是否有主持人': 'hasHost',
+                'hasHost': 'hasHost'
+            };
+
+            // 解析数据行
+            const resources = [];
+            for (let i = 1; i < lines.length; i++) {
+                const line = lines[i].trim();
+                if (!line) continue;
+
+                const values = line.split(',').map(v => v.trim().replace(/^"|"$/g, ''));
+                const resource = {
+                    activityTags: [],
+                    usedFrequency: 0
+                };
+
+                headers.forEach((header, index) => {
+                    const mappedField = fieldMap[header];
+                    if (mappedField && values[index]) {
+                        let value = values[index];
+                        // 数字类型转换
+                        if (['frequency', 'totalCost', 'singleCost', 'usedFrequency'].includes(mappedField)) {
+                            value = parseFloat(value) || 0;
+                        }
+                        resource[mappedField] = value;
+                    }
+                });
+
+                if (resource.mediaName && resource.mediaType) {
+                    resources.push(resource);
+                }
+            }
+
+            return resources;
+        }
+
+        // 页面关闭时取消监听
+        window.addEventListener('beforeunload', function() {
+            if (unsubscribeResources) {
+                unsubscribeResources();
+                console.log('🔌 已断开实时监听');
+            }
+            if (unsubscribeConfig) {
+                unsubscribeConfig();
+            }
+        });
+
+        // 初始化
+        loadFromStorage();
+        renderTable();
+    </script>
+    </div>
+</body>
+</html>
