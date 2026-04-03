@@ -1225,7 +1225,6 @@
                 <thead>
                     <tr>
                         <th>序号</th>
-                        <th>媒体类型</th>
                         <th>媒体名称</th>
                         <th>代理公司</th>
                         <th>原创/供稿</th>
@@ -2022,7 +2021,6 @@
                 const row = document.createElement('tr');
                 row.innerHTML = `
                     <td>${index + 1}</td>
-                    <td><span class="badge badge-type">${resource.mediaType}</span></td>
                     <td><strong>${resource.mediaName}</strong></td>
                     <td>${resource.agencyCompany || '-'}</td>
                     <td>${resource.originalType}</td>
