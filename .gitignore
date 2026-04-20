@@ -1,0 +1,32 @@
+# 截图文件
+*.png
+*.jpg
+*.jpeg
+*.gif
+
+# Excel 文件
+*.xlsx
+
+# 系统文件
+.DS_Store
+.localized
+
+# Word 文档
+*.docx
+
+# PDF 文件
+*.pdf
+
+# 其他不需要上传的文件
+firestore-rules.txt
+convert_to_excel.py
+快速修复脚本.sh
+错误反省与改进总结.md
+媒体数据库底库.md
+密码使用说明.md
+系统介绍文档.md
+清除云端数据.txt
+清除云端数据.html
+无标签.html
+无密码无云端.html
+无云端2.html
