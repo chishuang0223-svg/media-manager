@@ -1051,6 +1051,7 @@
                 <button class="export-btn" onclick="exportData()" style="background: linear-gradient(135deg, #7cb342 0%, #558b2f 100%);">💾 导出备份</button>
                 <button class="export-btn" onclick="document.getElementById('importFile').click()" style="background: linear-gradient(135deg, #42a5f5 0%, #1e88e5 100%);">📥 导入备份</button>
                 <button class="export-btn" onclick="document.getElementById('batchImportFile').click()" style="background: linear-gradient(135deg, #ef5350 0%, #e53935 100%);">📋 批量导入</button>
+                <button class="export-btn" onclick="markAllAs2025Dec()" style="background: linear-gradient(135deg, #8d6e63 0%, #6d4c41 100%);">📅 标记现有为25年12月</button>
             </div>
             <input type="file" id="importFile" accept=".json" style="display: none;" onchange="importData(event)">
             <input type="file" id="batchImportFile" accept=".json,.csv,.xlsx,.xls" style="display: none;" onchange="batchImportData(event)">
@@ -1092,6 +1093,7 @@
                         <th>使用频次/剩余</th>
                         <th>单次费用</th>
                         <th>剩余费用</th>
+                        <th>下单日期</th>
                         <th style="cursor: pointer; position: relative;" onclick="toggleHostFilter(event)">
                             主持人 <span style="font-size: 12px;">▼</span>
                             <div id="hostFilterDropdown" style="display: none; position: absolute; top: 100%; left: 0; background: white; border: 1px solid #ddd; border-radius: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); padding: 10px; min-width: 150px; z-index: 1000; max-height: 300px; overflow-y: auto;">
@@ -1358,6 +1360,24 @@
                     <select id="hasHost">
                         <option value="N">否</option>
                         <option value="Y">是</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>下单日期</label>
+                    <select id="orderDate">
+                        <option value="2025年12月">2025年12月</option>
+                        <option value="2026年1月">2026年1月</option>
+                        <option value="2026年2月">2026年2月</option>
+                        <option value="2026年3月">2026年3月</option>
+                        <option value="2026年4月">2026年4月</option>
+                        <option value="2026年5月">2026年5月</option>
+                        <option value="2026年6月">2026年6月</option>
+                        <option value="2026年7月">2026年7月</option>
+                        <option value="2026年8月">2026年8月</option>
+                        <option value="2026年9月">2026年9月</option>
+                        <option value="2026年10月">2026年10月</option>
+                        <option value="2026年11月">2026年11月</option>
+                        <option value="2026年12月">2026年12月</option>
                     </select>
                 </div>
                 <div class="form-actions">
@@ -2071,6 +2091,7 @@
                     </td>
                     <td class="price">¥${parseFloat(resource.singleCost).toLocaleString()}</td>
                     <td class="price">¥${parseFloat(remainingCost).toLocaleString()}</td>
+                    <td>${resource.orderDate || '-'}</td>
                     <td><span class="badge ${resource.hasHost === 'Y' ? 'badge-yes' : 'badge-no'}">${resource.hasHost === 'Y' ? '是' : '否'}</span></td>
                     <td>
                         <button class="action-btn" onclick="editResource(${resource.id})">编辑</button>
@@ -2292,8 +2313,23 @@
                 document.getElementById('frequency').value = resource.frequency;
                 document.getElementById('singleCostInput').value = resource.singleCost;
                 document.getElementById('hasHost').value = resource.hasHost;
+                document.getElementById('orderDate').value = resource.orderDate || '2025年12月';
                 document.getElementById('modal').style.display = 'block';
             }
+        }
+
+        // 批量将没有下单日期的资源标记为2025年12月
+        async function markAllAs2025Dec() {
+            const noDateResources = resources.filter(r => !r.orderDate);
+            if (noDateResources.length === 0) {
+                alert('所有资源已有下单日期，无需批量标记。');
+                return;
+            }
+            if (!confirm(`将为 ${noDateResources.length} 条没有下单日期的资源标记为"2025年12月"，确认继续？`)) return;
+            noDateResources.forEach(r => { r.orderDate = '2025年12月'; });
+            await saveToStorage();
+            renderTable();
+            alert(`✅ 已成功标记 ${noDateResources.length} 条资源为"2025年12月"。`);
         }
 
         // 删除资源
@@ -2329,7 +2365,8 @@
                 frequency: frequency,
                 singleCost: singleCost,
                 totalCost: singleCost * frequency,
-                hasHost: document.getElementById('hasHost').value
+                hasHost: document.getElementById('hasHost').value,
+                orderDate: document.getElementById('orderDate').value
             };
 
             if (editingId) {
