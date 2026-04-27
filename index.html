@@ -1051,7 +1051,6 @@
                 <button class="export-btn" onclick="exportData()" style="background: linear-gradient(135deg, #7cb342 0%, #558b2f 100%);">💾 导出备份</button>
                 <button class="export-btn" onclick="document.getElementById('importFile').click()" style="background: linear-gradient(135deg, #42a5f5 0%, #1e88e5 100%);">📥 导入备份</button>
                 <button class="export-btn" onclick="document.getElementById('batchImportFile').click()" style="background: linear-gradient(135deg, #ef5350 0%, #e53935 100%);">📋 批量导入</button>
-                <button class="export-btn" onclick="markAllAs2025Dec()" style="background: linear-gradient(135deg, #8d6e63 0%, #6d4c41 100%);">📅 标记现有为25年12月</button>
             </div>
             <input type="file" id="importFile" accept=".json" style="display: none;" onchange="importData(event)">
             <input type="file" id="batchImportFile" accept=".json,.csv,.xlsx,.xls" style="display: none;" onchange="batchImportData(event)">
@@ -2316,20 +2315,6 @@
                 document.getElementById('orderDate').value = resource.orderDate || '2025年12月';
                 document.getElementById('modal').style.display = 'block';
             }
-        }
-
-        // 批量将没有下单日期的资源标记为2025年12月
-        async function markAllAs2025Dec() {
-            const noDateResources = resources.filter(r => !r.orderDate);
-            if (noDateResources.length === 0) {
-                alert('所有资源已有下单日期，无需批量标记。');
-                return;
-            }
-            if (!confirm(`将为 ${noDateResources.length} 条没有下单日期的资源标记为"2025年12月"，确认继续？`)) return;
-            noDateResources.forEach(r => { r.orderDate = '2025年12月'; });
-            await saveToStorage();
-            renderTable();
-            alert(`✅ 已成功标记 ${noDateResources.length} 条资源为"2025年12月"。`);
         }
 
         // 删除资源
