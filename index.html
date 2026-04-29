@@ -2098,7 +2098,7 @@
                     <td><span class="badge badge-content">${resource.contentType}</span></td>
                     <td><span class="badge badge-platform">${resource.platform}</span></td>
                     <td>${resource.detail}</td>
-                    <td class="notes-cell" style="width:28px;min-width:28px;max-width:28px;text-align:center;font-size:15px;cursor:default;" data-notes="${(resource.notes||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/\n/g,'&#10;')}">${resource.notes ? '📝' : ''}</td>
+                    <td class="notes-cell" style="width:28px;min-width:28px;max-width:28px;text-align:center;font-size:15px;cursor:default;" data-notes="${(resource.notes||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/\n/g,'&#10;')}">${resource.notes ? '📝' : '无'}</td>
                     <td class="tags-cell">
                         ${tagsHtml}
                     </td>
