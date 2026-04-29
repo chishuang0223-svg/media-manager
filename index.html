@@ -1083,6 +1083,7 @@
                             </div>
                         </th>
                         <th>详细资源</th>
+                        <th>备注</th>
                         <th style="cursor: pointer; position: relative;" onclick="toggleTagFilter(event)">
                             活动标签 <span style="font-size: 12px;">▼</span>
                             <div id="tagFilterDropdown" style="display: none; position: absolute; top: 100%; left: 0; background: white; border: 1px solid #ddd; border-radius: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); padding: 10px; min-width: 200px; z-index: 1000; max-height: 300px; overflow-y: auto;">
@@ -2079,6 +2080,7 @@
                     <td><span class="badge badge-content">${resource.contentType}</span></td>
                     <td><span class="badge badge-platform">${resource.platform}</span></td>
                     <td>${resource.detail}</td>
+                    <td style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${(resource.notes||'').replace(/"/g,'&quot;')}">${resource.notes || '-'}</td>
                     <td class="tags-cell">
                         ${tagsHtml}
                     </td>
