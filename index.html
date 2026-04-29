@@ -448,6 +448,24 @@
             word-wrap: break-word;
         }
 
+        /* 备注自定义 tooltip */
+        #notesTooltip {
+            display: none;
+            position: fixed;
+            background: #333;
+            color: #fff;
+            font-size: 14px;
+            line-height: 1.6;
+            padding: 10px 14px;
+            border-radius: 8px;
+            max-width: 280px;
+            white-space: pre-wrap;
+            word-break: break-all;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            z-index: 9999;
+            pointer-events: none;
+        }
+
         #tagSummaryTable td:nth-child(8) { /* 操作 */
             width: 200px;
             text-align: center;
@@ -1083,7 +1101,7 @@
                             </div>
                         </th>
                         <th>详细资源</th>
-                        <th style="width:40px;min-width:40px;text-align:center;">备注</th>
+                        <th style="width:28px;min-width:28px;text-align:center;">备注</th>
                         <th style="cursor: pointer; position: relative;" onclick="toggleTagFilter(event)">
                             活动标签 <span style="font-size: 12px;">▼</span>
                             <div id="tagFilterDropdown" style="display: none; position: absolute; top: 100%; left: 0; background: white; border: 1px solid #ddd; border-radius: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); padding: 10px; min-width: 200px; z-index: 1000; max-height: 300px; overflow-y: auto;">
@@ -2080,7 +2098,7 @@
                     <td><span class="badge badge-content">${resource.contentType}</span></td>
                     <td><span class="badge badge-platform">${resource.platform}</span></td>
                     <td>${resource.detail}</td>
-                    <td style="width:40px;min-width:40px;max-width:40px;text-align:center;font-size:16px;cursor:default;" title="${(resource.notes||'').replace(/"/g,'&quot;').replace(/\n/g,'&#10;')}">${resource.notes ? '📝' : ''}</td>
+                    <td style="width:28px;min-width:28px;max-width:28px;text-align:center;font-size:15px;cursor:default;" data-notes="${(resource.notes||'').replace(/"/g,'&quot;')}" onmouseenter="showNotesTooltip(this)" onmouseleave="hideNotesTooltip()">${resource.notes ? '📝' : ''}</td>
                     <td class="tags-cell">
                         ${tagsHtml}
                     </td>
@@ -3402,5 +3420,26 @@
         // renderTable();
     </script>
     </div>
+
+    <div id="notesTooltip"></div>
+    <script>
+        const notesTooltip = document.getElementById('notesTooltip');
+        document.addEventListener('mousemove', e => {
+            if (notesTooltip.style.display === 'block') {
+                const x = e.clientX + 14, y = e.clientY + 14;
+                notesTooltip.style.left = (x + notesTooltip.offsetWidth > window.innerWidth ? e.clientX - notesTooltip.offsetWidth - 8 : x) + 'px';
+                notesTooltip.style.top = (y + notesTooltip.offsetHeight > window.innerHeight ? e.clientY - notesTooltip.offsetHeight - 8 : y) + 'px';
+            }
+        });
+        function showNotesTooltip(el) {
+            const notes = el.dataset.notes;
+            if (!notes) return;
+            notesTooltip.textContent = notes;
+            notesTooltip.style.display = 'block';
+        }
+        function hideNotesTooltip() {
+            notesTooltip.style.display = 'none';
+        }
+    </script>
 </body>
 </html>
