@@ -1872,6 +1872,22 @@
         }
 
         // 保存到localStorage或Firebase
+        // 保存单条资源（标签/频次变更专用，只写1条，不消耗大量配额）
+        async function saveOneToStorage(resource) {
+            if (firebaseReady && resource.firestoreId) {
+                try {
+                    const docRef = db.collection(COLLECTION_RESOURCES).doc(resource.firestoreId);
+                    const { firestoreId, ...data } = resource;
+                    await docRef.update(data);
+                    console.log('✅ 已保存:', resource.mediaName);
+                    return;
+                } catch (error) {
+                    console.error('❌ 单条保存失败，降级到本地:', error);
+                }
+            }
+            saveToLocalStorage();
+        }
+
         async function saveToStorage() {
             if (firebaseReady) {
                 await saveToFirebase();
@@ -2134,7 +2150,7 @@
                 if (resource.usedFrequency < 0) resource.usedFrequency = 0;
                 if (resource.usedFrequency > resource.frequency) resource.usedFrequency = resource.frequency;
 
-                saveToStorage();
+                saveOneToStorage(resource);
                 renderTable();
             }
         }
@@ -2181,7 +2197,7 @@
                 resource.activityTags.push(activityName);
                 resource.usedFrequency = usedFrequency + 1;
 
-                saveToStorage();
+                saveOneToStorage(resource);
                 renderTable();
                 closeTagModal();
             }
@@ -2201,7 +2217,7 @@
                     resource.activityTags.splice(tagIndex, 1);
                     // 减少使用频次
                     resource.usedFrequency = Math.max(0, (resource.usedFrequency || 0) - 1);
-                    saveToStorage();
+                    saveOneToStorage(resource);
                     renderTable();
                 }
             }
