@@ -283,6 +283,22 @@
             white-space: nowrap;
         }
 
+        /* 列宽拖拽手柄 */
+        .col-resize-handle {
+            position: absolute;
+            right: 0;
+            top: 0;
+            width: 6px;
+            height: 100%;
+            cursor: col-resize;
+            user-select: none;
+            z-index: 10;
+        }
+        .col-resize-handle:hover,
+        .col-resize-handle.resizing {
+            background: rgba(84, 110, 122, 0.45);
+        }
+
         td {
             padding: 15px;
             border-bottom: 1px solid #f0f0f0;
@@ -1617,6 +1633,7 @@
             try {
                 renderTable();
                 updateStats();
+                initResizableColumns();
                 console.log('✅ 本地数据渲染完成');
             } catch (error) {
                 console.error('❌ 渲染数据出错:', error);
@@ -2430,6 +2447,51 @@
             renderTable();
             closeModal();
         });
+
+        // 列宽拖拽调整
+        function initResizableColumns() {
+            const table = document.getElementById('resourceTable');
+            if (!table || table.dataset.resizeInit) return;
+            table.dataset.resizeInit = '1';
+
+            table.querySelectorAll('thead th').forEach(th => {
+                th.style.position = 'relative';
+                const handle = document.createElement('div');
+                handle.className = 'col-resize-handle';
+                th.appendChild(handle);
+
+                handle.addEventListener('mousedown', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+
+                    const startX = e.pageX;
+                    const startWidth = th.offsetWidth;
+
+                    // 首次拖动时锁定所有列的当前宽度，切换为 fixed 布局
+                    if (table.style.tableLayout !== 'fixed') {
+                        table.querySelectorAll('thead th').forEach(t => {
+                            t.style.width = t.offsetWidth + 'px';
+                        });
+                        table.style.tableLayout = 'fixed';
+                        table.style.width = table.offsetWidth + 'px';
+                    }
+
+                    handle.classList.add('resizing');
+
+                    function onMouseMove(e) {
+                        const newWidth = Math.max(40, startWidth + e.pageX - startX);
+                        th.style.width = newWidth + 'px';
+                    }
+                    function onMouseUp() {
+                        handle.classList.remove('resizing');
+                        document.removeEventListener('mousemove', onMouseMove);
+                        document.removeEventListener('mouseup', onMouseUp);
+                    }
+                    document.addEventListener('mousemove', onMouseMove);
+                    document.addEventListener('mouseup', onMouseUp);
+                });
+            });
+        }
 
         // 搜索功能
         document.getElementById('searchInput').addEventListener('input', function(e) {
