@@ -351,8 +351,8 @@
         }
 
         td:nth-child(6) { /* 内容类型 */
-            width: 100px;
-            min-width: 100px;
+            width: 70px;
+            min-width: 70px;
             white-space: normal;
             word-wrap: break-word;
             word-break: keep-all;
@@ -1160,7 +1160,12 @@
                                 <!-- 原创/供稿筛选选项 -->
                             </div>
                         </th>
-                        <th>内容类型</th>
+                        <th style="cursor: pointer; position: relative; white-space: nowrap;" onclick="toggleContentTypeFilter(event)">
+                            内容类型 <span style="font-size: 12px;">▼</span>
+                            <div id="contentTypeFilterDropdown" onclick="event.stopPropagation()" style="display: none; position: absolute; top: 100%; left: 0; background: white; border: 1px solid #ddd; border-radius: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); padding: 10px; min-width: 150px; z-index: 1000; max-height: 300px; overflow-y: auto;">
+                                <!-- 内容类型筛选选项 -->
+                            </div>
+                        </th>
                         <th style="cursor: pointer; position: relative;" onclick="togglePlatformFilter(event)">
                             发布平台 <span style="font-size: 12px;">▼</span>
                             <div id="platformFilterDropdown" style="display: none; position: absolute; top: 100%; left: 0; background: white; border: 1px solid #ddd; border-radius: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); padding: 10px; min-width: 200px; z-index: 1000; max-height: 300px; overflow-y: auto;">
@@ -2080,6 +2085,13 @@
                 );
             }
 
+            // 应用内容类型筛选
+            if (currentContentTypeFilter) {
+                filteredResources = filteredResources.filter(r =>
+                    r.contentType === currentContentTypeFilter
+                );
+            }
+
             // 应用发布平台筛选
             if (currentPlatformFilter) {
                 filteredResources = filteredResources.filter(r =>
@@ -2787,6 +2799,44 @@
             document.getElementById('originalTypeFilterDropdown').style.display = 'none';
         }
 
+        // === 内容类型筛选 ===
+        function updateContentTypeFilterButtons() {
+            const dropdown = document.getElementById('contentTypeFilterDropdown');
+            if (!dropdown) return;
+            const allTypes = new Set();
+            resources.forEach(r => { if (r.contentType) allTypes.add(r.contentType); });
+            let html = `<div style="padding: 8px; cursor: pointer; border-radius: 4px; ${!currentContentTypeFilter ? 'background: #546e7a; color: white;' : ''}"
+                onclick="filterByContentType(null, event)">
+                ${!currentContentTypeFilter ? '✓ ' : ''}全部
+            </div>`;
+            Array.from(allTypes).sort().forEach(type => {
+                const isActive = currentContentTypeFilter === type;
+                html += `<div style="padding: 8px; cursor: pointer; border-radius: 4px; ${isActive ? 'background: #546e7a; color: white;' : ''}"
+                    onmouseover="this.style.background=this.style.color?'':'#f0f0f0'"
+                    onmouseout="this.style.background=this.style.color?'':''"
+                    onclick="filterByContentType('${type}', event)">
+                    ${isActive ? '✓ ' : ''}${type}
+                </div>`;
+            });
+            dropdown.innerHTML = html;
+        }
+        function toggleContentTypeFilter(event) {
+            event.stopPropagation();
+            const dropdown = document.getElementById('contentTypeFilterDropdown');
+            if (dropdown.style.display === 'none') {
+                dropdown.style.display = 'block';
+                updateContentTypeFilterButtons();
+            } else {
+                dropdown.style.display = 'none';
+            }
+        }
+        function filterByContentType(type, event) {
+            event.stopPropagation();
+            currentContentTypeFilter = type;
+            renderTable();
+            document.getElementById('contentTypeFilterDropdown').style.display = 'none';
+        }
+
         // === 发布平台筛选 ===
         function updatePlatformFilterButtons() {
             const dropdown = document.getElementById('platformFilterDropdown');
@@ -2890,6 +2940,7 @@
                 'tagFilterDropdown',
                 'mediaTypeFilterDropdown',
                 'originalTypeFilterDropdown',
+                'contentTypeFilterDropdown',
                 'platformFilterDropdown',
                 'hostFilterDropdown',
                 'summaryTagNameFilterDropdown',
