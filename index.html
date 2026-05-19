@@ -332,7 +332,7 @@
         }
 
         /* 列宽优化 - 中等宽度列，支持换行 */
-        td:nth-child(2), td:nth-child(6) { /* 媒体类型、内容类型 */
+        td:nth-child(2) { /* 媒体类型 */
             width: 100px;
             min-width: 100px;
             white-space: normal;
@@ -392,7 +392,7 @@
             text-align: center;
         }
 
-        #activityDetailTable td:nth-child(2), #activityDetailTable td:nth-child(6) { /* 媒体类型、内容类型 */
+        #activityDetailTable td:nth-child(2) { /* 媒体类型 */
             width: 100px;
             min-width: 100px;
             white-space: normal;
@@ -1071,23 +1071,19 @@
                         <button class="filter-btn" data-filter="used-up" data-type="status">已用完</button>
                     </div>
                 </div>
-                <div class="filter-section">
-                    <span class="filter-section-label">内容类型</span>
-                    <div style="display: flex; gap: 10px;">
-                        <button class="filter-btn" data-filter="图文" data-type="content">图文</button>
-                        <button class="filter-btn" data-filter="视频" data-type="content">视频</button>
-                        <button class="filter-btn" data-filter="原创" data-type="content">原创</button>
-                        <button class="filter-btn" data-filter="供稿" data-type="content">供稿</button>
-                    </div>
-                </div>
             </div>
             <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
                 <button class="export-btn summary-btn" onclick="openTagSummaryPage()">📊 标签汇总</button>
                 <div style="flex: 1; min-width: 10px;"></div>
-                <button class="add-btn" onclick="openAddModal()">+ 添加资源</button>
-                <button class="export-btn" onclick="exportData()" style="background: linear-gradient(135deg, #7cb342 0%, #558b2f 100%);">💾 导出备份</button>
-                <button class="export-btn" onclick="document.getElementById('importFile').click()" style="background: linear-gradient(135deg, #42a5f5 0%, #1e88e5 100%);">📥 导入备份</button>
-                <button class="export-btn" onclick="document.getElementById('batchImportFile').click()" style="background: linear-gradient(135deg, #ef5350 0%, #e53935 100%);">📋 批量导入</button>
+                <div style="position: relative;">
+                    <button class="export-btn" onclick="toggleManageMenu(event)" style="background: linear-gradient(135deg, #78909c 0%, #546e7a 100%);">⚙️ 管理</button>
+                    <div id="manageDropdown" onclick="event.stopPropagation()" style="display: none; position: absolute; top: calc(100% + 6px); right: 0; background: white; border: 1px solid #ddd; border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,0.15); padding: 6px; min-width: 148px; z-index: 1000;">
+                        <div onclick="openAddModal(); document.getElementById('manageDropdown').style.display='none'" style="padding: 9px 14px; cursor: pointer; border-radius: 4px; font-size: 14px;" onmouseover="this.style.background='#f5f5f5'" onmouseout="this.style.background=''">+ 添加资源</div>
+                        <div onclick="exportData(); document.getElementById('manageDropdown').style.display='none'" style="padding: 9px 14px; cursor: pointer; border-radius: 4px; font-size: 14px;" onmouseover="this.style.background='#f5f5f5'" onmouseout="this.style.background=''">💾 导出备份</div>
+                        <div onclick="document.getElementById('importFile').click(); document.getElementById('manageDropdown').style.display='none'" style="padding: 9px 14px; cursor: pointer; border-radius: 4px; font-size: 14px;" onmouseover="this.style.background='#f5f5f5'" onmouseout="this.style.background=''">📥 导入备份</div>
+                        <div onclick="document.getElementById('batchImportFile').click(); document.getElementById('manageDropdown').style.display='none'" style="padding: 9px 14px; cursor: pointer; border-radius: 4px; font-size: 14px;" onmouseover="this.style.background='#f5f5f5'" onmouseout="this.style.background=''">📋 批量导入</div>
+                    </div>
+                </div>
             </div>
             <input type="file" id="importFile" accept=".json" style="display: none;" onchange="importData(event)">
             <input type="file" id="batchImportFile" accept=".json,.csv,.xlsx,.xls" style="display: none;" onchange="batchImportData(event)">
@@ -1110,12 +1106,6 @@
                             原创/供稿 <span style="font-size: 12px;">▼</span>
                             <div id="originalTypeFilterDropdown" onclick="event.stopPropagation()" style="display: none; position: absolute; top: 100%; left: 0; background: white; border: 1px solid #ddd; border-radius: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); padding: 10px; min-width: 160px; z-index: 1000; max-height: 300px; overflow-y: auto;">
                                 <!-- 原创/供稿筛选选项 -->
-                            </div>
-                        </th>
-                        <th style="cursor: pointer; position: relative;" onclick="toggleContentTypeFilter(event)">
-                            内容类型 <span style="font-size: 12px;">▼</span>
-                            <div id="contentTypeFilterDropdown" style="display: none; position: absolute; top: 100%; left: 0; background: white; border: 1px solid #ddd; border-radius: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); padding: 10px; min-width: 200px; z-index: 1000; max-height: 300px; overflow-y: auto;">
-                                <!-- 内容类型筛选选项 -->
                             </div>
                         </th>
                         <th style="cursor: pointer; position: relative;" onclick="togglePlatformFilter(event)">
@@ -1663,7 +1653,7 @@
         let currentTagFilter = null;
         let currentMediaTypeFilter = null;
         let currentOriginalTypeFilter = null;
-        let currentContentTypeFilter = null;
+        let currentContentTypeFilter = null; // kept for compatibility
         let currentPlatformFilter = null;
         let currentHostFilter = null;
         let currentSearch = '';
@@ -2033,13 +2023,6 @@
                 );
             }
 
-            // 应用内容类型筛选
-            if (currentContentTypeFilter) {
-                filteredResources = filteredResources.filter(r =>
-                    r.contentType === currentContentTypeFilter
-                );
-            }
-
             // 应用发布平台筛选
             if (currentPlatformFilter) {
                 filteredResources = filteredResources.filter(r =>
@@ -2144,7 +2127,6 @@
                     <td><strong>${resource.mediaName}</strong></td>
                     <td>${resource.agencyCompany || '-'}</td>
                     <td>${resource.originalType}</td>
-                    <td><span class="badge badge-content">${resource.contentType}</span></td>
                     <td><span class="badge badge-platform">${resource.platform}</span></td>
                     <td>${resource.detail}</td>
                     <td class="notes-cell" style="width:28px;min-width:28px;max-width:28px;text-align:center;font-size:15px;cursor:default;" data-notes="${(resource.notes||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/\n/g,'&#10;')}">${resource.notes ? '📝' : '无'}</td>
@@ -2611,6 +2593,12 @@
             dropdown.innerHTML = html;
         }
 
+        function toggleManageMenu(event) {
+            event.stopPropagation();
+            const dropdown = document.getElementById('manageDropdown');
+            dropdown.style.display = dropdown.style.display === 'none' ? 'block' : 'none';
+        }
+
         function toggleMediaTypeFilter(event) {
             event.stopPropagation();
             const dropdown = document.getElementById('mediaTypeFilterDropdown');
@@ -2668,57 +2656,6 @@
             currentOriginalTypeFilter = type;
             renderTable();
             document.getElementById('originalTypeFilterDropdown').style.display = 'none';
-        }
-
-        // === 内容类型筛选 ===
-        function updateContentTypeFilterButtons() {
-            const dropdown = document.getElementById('contentTypeFilterDropdown');
-            if (!dropdown) return;
-
-            const allTypes = new Set();
-            resources.forEach(r => {
-                if (r.contentType) {
-                    allTypes.add(r.contentType);
-                }
-            });
-
-            let html = '<div style="margin-bottom: 8px; font-weight: 600; color: #666;">选择内容类型筛选：</div>';
-            html += `<div style="padding: 8px; cursor: pointer; border-radius: 4px; ${!currentContentTypeFilter ? 'background: #546e7a; color: white;' : ''}"
-                onclick="filterByContentType(null, event)">
-                ${!currentContentTypeFilter ? '✓ ' : ''}全部类型
-            </div>`;
-
-            if (allTypes.size > 0) {
-                Array.from(allTypes).sort().forEach(type => {
-                    const isActive = currentContentTypeFilter === type;
-                    html += `<div style="padding: 8px; cursor: pointer; border-radius: 4px; ${isActive ? 'background: #546e7a; color: white;' : ''}"
-                        onmouseover="if(!this.style.color) this.style.background='#f0f0f0'"
-                        onmouseout="if(!this.style.color) this.style.background=''"
-                        onclick="filterByContentType('${type}', event)">
-                        ${isActive ? '✓ ' : ''}${type}
-                    </div>`;
-                });
-            }
-
-            dropdown.innerHTML = html;
-        }
-
-        function toggleContentTypeFilter(event) {
-            event.stopPropagation();
-            const dropdown = document.getElementById('contentTypeFilterDropdown');
-            if (dropdown.style.display === 'none') {
-                dropdown.style.display = 'block';
-                updateContentTypeFilterButtons();
-            } else {
-                dropdown.style.display = 'none';
-            }
-        }
-
-        function filterByContentType(type, event) {
-            event.stopPropagation();
-            currentContentTypeFilter = type;
-            renderTable();
-            document.getElementById('contentTypeFilterDropdown').style.display = 'none';
         }
 
         // === 发布平台筛选 ===
@@ -2824,12 +2761,12 @@
                 'tagFilterDropdown',
                 'mediaTypeFilterDropdown',
                 'originalTypeFilterDropdown',
-                'contentTypeFilterDropdown',
                 'platformFilterDropdown',
                 'hostFilterDropdown',
                 'summaryTagNameFilterDropdown',
                 'summaryDirectionFilterDropdown',
-                'summaryTimeFilterDropdown'
+                'summaryTimeFilterDropdown',
+                'manageDropdown'
             ];
 
             dropdowns.forEach(id => {
