@@ -314,17 +314,17 @@
             text-align: center;
         }
 
-        td:nth-child(10) { /* 使用频次/剩余 */
+        td:nth-child(11) { /* 使用频次/剩余 */
             width: 100px;
             text-align: center;
         }
 
-        td:nth-child(5), td:nth-child(14) { /* 原创/供稿、主持人 */
+        td:nth-child(5), td:nth-child(15) { /* 原创/供稿、主持人 */
             width: 80px;
             text-align: center;
         }
 
-        td:nth-child(15) { /* 操作 */
+        td:nth-child(16) { /* 操作 */
             width: 120px;
             text-align: center;
         }
@@ -350,14 +350,22 @@
             word-wrap: break-word;
         }
 
-        td:nth-child(6) { /* 发布平台 */
+        td:nth-child(6) { /* 内容类型 */
+            width: 100px;
+            min-width: 100px;
+            white-space: normal;
+            word-wrap: break-word;
+            word-break: keep-all;
+        }
+
+        td:nth-child(7) { /* 发布平台 */
             width: 70px;
             min-width: 70px;
             white-space: normal;
             word-wrap: break-word;
         }
 
-        td:nth-child(7) { /* 详细资源 */
+        td:nth-child(8) { /* 详细资源 */
             width: 400px;
             max-width: 400px;
             white-space: normal;
@@ -366,7 +374,7 @@
             overflow: hidden;
         }
 
-        td:nth-child(9) { /* 活动标签 */
+        td:nth-child(10) { /* 活动标签 */
             min-width: 150px;
             max-width: 450px;
             white-space: normal;
@@ -379,7 +387,7 @@
             width: auto !important;
         }
 
-        td:nth-child(11), td:nth-child(12) { /* 单次费用、剩余费用 */
+        td:nth-child(12), td:nth-child(13) { /* 单次费用、剩余费用 */
             width: 110px;
             text-align: right;
         }
@@ -1152,6 +1160,7 @@
                                 <!-- 原创/供稿筛选选项 -->
                             </div>
                         </th>
+                        <th>内容类型</th>
                         <th style="cursor: pointer; position: relative;" onclick="togglePlatformFilter(event)">
                             发布平台 <span style="font-size: 12px;">▼</span>
                             <div id="platformFilterDropdown" style="display: none; position: absolute; top: 100%; left: 0; background: white; border: 1px solid #ddd; border-radius: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); padding: 10px; min-width: 200px; z-index: 1000; max-height: 300px; overflow-y: auto;">
@@ -2175,6 +2184,7 @@
                     <td><strong>${resource.mediaName}</strong></td>
                     <td>${resource.agencyCompany || '-'}</td>
                     <td>${resource.originalType}</td>
+                    <td><span class="badge badge-content">${resource.contentType}</span></td>
                     <td><span class="badge badge-platform">${resource.platform}</span></td>
                     <td>${resource.detail}</td>
                     <td class="notes-cell" style="width:28px;min-width:28px;max-width:28px;text-align:center;font-size:15px;cursor:default;" data-notes="${(resource.notes||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/\n/g,'&#10;')}">${resource.notes ? '📝' : '无'}</td>
