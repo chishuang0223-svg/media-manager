@@ -2454,41 +2454,40 @@
             if (!table || table.dataset.resizeInit) return;
             table.dataset.resizeInit = '1';
 
-            table.querySelectorAll('thead th').forEach(th => {
+            const ths = Array.from(table.querySelectorAll('thead th'));
+            ths.forEach(th => {
                 th.style.position = 'relative';
                 const handle = document.createElement('div');
                 handle.className = 'col-resize-handle';
                 th.appendChild(handle);
 
-                handle.addEventListener('mousedown', function(e) {
+                handle.addEventListener('mousedown', e => {
                     e.preventDefault();
                     e.stopPropagation();
 
                     const startX = e.pageX;
-                    const startWidth = th.offsetWidth;
+                    const startWidth = th.getBoundingClientRect().width;
 
-                    // 首次拖动时锁定所有列的当前宽度，切换为 fixed 布局
+                    // 首次拖动时锁定所有列的当前宽度，切换为 fixed 布局（不锁定表格总宽）
                     if (table.style.tableLayout !== 'fixed') {
-                        table.querySelectorAll('thead th').forEach(t => {
-                            t.style.width = t.offsetWidth + 'px';
+                        ths.forEach(t => {
+                            t.style.width = t.getBoundingClientRect().width + 'px';
                         });
                         table.style.tableLayout = 'fixed';
-                        table.style.width = table.offsetWidth + 'px';
                     }
 
                     handle.classList.add('resizing');
 
-                    function onMouseMove(e) {
-                        const newWidth = Math.max(40, startWidth + e.pageX - startX);
-                        th.style.width = newWidth + 'px';
-                    }
-                    function onMouseUp() {
+                    const onMove = e => {
+                        th.style.width = Math.max(40, startWidth + e.pageX - startX) + 'px';
+                    };
+                    const onUp = () => {
                         handle.classList.remove('resizing');
-                        document.removeEventListener('mousemove', onMouseMove);
-                        document.removeEventListener('mouseup', onMouseUp);
-                    }
-                    document.addEventListener('mousemove', onMouseMove);
-                    document.addEventListener('mouseup', onMouseUp);
+                        document.removeEventListener('mousemove', onMove);
+                        document.removeEventListener('mouseup', onUp);
+                    };
+                    document.addEventListener('mousemove', onMove);
+                    document.addEventListener('mouseup', onUp);
                 });
             });
         }
