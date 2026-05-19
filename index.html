@@ -2296,12 +2296,15 @@
 
             // 切换页面
             document.getElementById('mainView').style.display = 'none';
+            document.getElementById('tagSummaryView').style.display = 'none';
+            document.getElementById('activityDetailView').style.display = 'block';
             document.getElementById('activityDetailView').classList.add('active');
         }
 
         // 返回主列表
         function backToMain() {
             document.getElementById('mainView').style.display = 'block';
+            document.getElementById('activityDetailView').style.display = 'none';
             document.getElementById('activityDetailView').classList.remove('active');
         }
 
