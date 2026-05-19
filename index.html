@@ -465,6 +465,52 @@
             word-wrap: break-word;
         }
 
+        /* 撤销删除 Toast */
+        #undoToast {
+            display: none;
+            position: fixed;
+            bottom: 32px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #37474f;
+            color: #fff;
+            padding: 14px 20px;
+            border-radius: 10px;
+            box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+            z-index: 99999;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            font-size: 14px;
+            min-width: 280px;
+            animation: toastIn 0.25s ease;
+        }
+        #undoToast.hidden { display: none !important; }
+        #undoToast .undo-progress {
+            position: absolute;
+            bottom: 0; left: 0;
+            height: 3px;
+            background: #90a4ae;
+            border-radius: 0 0 10px 10px;
+            transition: width linear;
+        }
+        #undoToast .undo-btn {
+            background: #fff;
+            color: #37474f;
+            border: none;
+            padding: 6px 14px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 700;
+            font-size: 13px;
+            flex-shrink: 0;
+        }
+        #undoToast .undo-btn:hover { background: #eceff1; }
+        @keyframes toastIn {
+            from { opacity: 0; transform: translateX(-50%) translateY(12px); }
+            to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+        }
+
         /* 备注自定义 tooltip */
         #notesTooltip {
             display: none;
@@ -2374,29 +2420,81 @@
             }
         }
 
+        // 撤销删除
+        let _undoResource = null;
+        let _undoTimer = null;
+        const UNDO_SECONDS = 8;
+
+        function showUndoToast(resourceName) {
+            const toast = document.getElementById('undoToast');
+            const progress = document.getElementById('undoProgress');
+            document.getElementById('undoToastMsg').textContent = `已删除「${resourceName}」`;
+            toast.classList.remove('hidden');
+            // 进度条动画
+            progress.style.transition = 'none';
+            progress.style.width = '100%';
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    progress.style.transition = `width ${UNDO_SECONDS}s linear`;
+                    progress.style.width = '0%';
+                });
+            });
+            if (_undoTimer) clearTimeout(_undoTimer);
+            _undoTimer = setTimeout(() => {
+                toast.classList.add('hidden');
+                _undoResource = null;
+            }, UNDO_SECONDS * 1000);
+        }
+
+        async function undoDelete() {
+            if (!_undoResource) return;
+            const resource = _undoResource;
+            _undoResource = null;
+            clearTimeout(_undoTimer);
+            document.getElementById('undoToast').classList.add('hidden');
+
+            if (firebaseReady && resource.firestoreId) {
+                try {
+                    const { firestoreId, ...data } = resource;
+                    await db.collection(COLLECTION_RESOURCES).doc(firestoreId).set(data);
+                    console.log('✅ 已恢复:', resource.mediaName);
+                    // onSnapshot 自动刷新列表
+                } catch (error) {
+                    console.error('❌ 恢复失败:', error);
+                    resources.push(resource);
+                    saveToLocalStorage();
+                    renderTable();
+                }
+            } else {
+                resources.push(resource);
+                saveToLocalStorage();
+                renderTable();
+            }
+        }
+
         // 删除资源
         async function deleteResource(id) {
-            if (confirm('确定要删除这个媒体资源吗？')) {
-                const resource = resources.find(r => r.id === id);
+            const resource = resources.find(r => r.id === id);
+            if (!resource) return;
 
-                if (firebaseReady && resource && resource.firestoreId) {
-                    try {
-                        await db.collection(COLLECTION_RESOURCES).doc(resource.firestoreId).delete();
-                        console.log('✅ 已从云端删除:', resource.mediaName);
-                        // onSnapshot 会自动触发，刷新本地列表，无需手动操作
-                    } catch (error) {
-                        console.error('❌ 云端删除失败:', error);
-                        // 云端失败时降级到本地删除
-                        resources = resources.filter(r => r.id !== id);
-                        saveToLocalStorage();
-                        renderTable();
-                    }
-                } else {
-                    // 无 Firebase，纯本地删除
+            _undoResource = { ...resource };
+
+            if (firebaseReady && resource.firestoreId) {
+                try {
+                    await db.collection(COLLECTION_RESOURCES).doc(resource.firestoreId).delete();
+                    showUndoToast(resource.mediaName);
+                } catch (error) {
+                    console.error('❌ 云端删除失败:', error);
+                    _undoResource = null;
                     resources = resources.filter(r => r.id !== id);
                     saveToLocalStorage();
                     renderTable();
                 }
+            } else {
+                resources = resources.filter(r => r.id !== id);
+                saveToLocalStorage();
+                renderTable();
+                showUndoToast(resource.mediaName);
             }
         }
 
@@ -3520,6 +3618,11 @@
     </div>
 
     <div id="notesTooltip"></div>
+    <div id="undoToast" class="hidden">
+        <span id="undoToastMsg"></span>
+        <button class="undo-btn" onclick="undoDelete()">撤销</button>
+        <div class="undo-progress" id="undoProgress"></div>
+    </div>
     <script>
         const notesTooltip = document.getElementById('notesTooltip');
 
