@@ -272,7 +272,7 @@
         }
 
         th {
-            padding: 15px;
+            padding: 15px 18px 15px 15px;
             text-align: left;
             font-weight: 600;
             color: #333;
@@ -281,6 +281,7 @@
             letter-spacing: 0.5px;
             border-bottom: 2px solid #e0e0e0;
             white-space: nowrap;
+            position: relative;
         }
 
         /* 列宽拖拽手柄 */
@@ -288,15 +289,17 @@
             position: absolute;
             right: 0;
             top: 0;
+            bottom: 0;
             width: 6px;
-            height: 100%;
             cursor: col-resize;
             user-select: none;
             z-index: 10;
+            border-right: 2px solid #d0d0d0;
         }
         .col-resize-handle:hover,
         .col-resize-handle.resizing {
-            background: rgba(84, 110, 122, 0.45);
+            background: rgba(84, 110, 122, 0.25);
+            border-right: 2px solid rgba(84, 110, 122, 0.7);
         }
 
         td {
@@ -2451,12 +2454,14 @@
         // 列宽拖拽调整
         function initResizableColumns() {
             const table = document.getElementById('resourceTable');
-            if (!table || table.dataset.resizeInit) return;
-            table.dataset.resizeInit = '1';
+            if (!table) return;
+
+            // 清除旧 handle（防止重复初始化时叠加）
+            table.querySelectorAll('.col-resize-handle').forEach(h => h.remove());
+            table.style.tableLayout = '';
 
             const ths = Array.from(table.querySelectorAll('thead th'));
             ths.forEach(th => {
-                th.style.position = 'relative';
                 const handle = document.createElement('div');
                 handle.className = 'col-resize-handle';
                 th.appendChild(handle);
@@ -2468,7 +2473,7 @@
                     const startX = e.pageX;
                     const startWidth = th.getBoundingClientRect().width;
 
-                    // 首次拖动时锁定所有列的当前宽度，切换为 fixed 布局（不锁定表格总宽）
+                    // 锁定所有列的当前宽度，切换为 fixed 布局（不锁定表格总宽）
                     if (table.style.tableLayout !== 'fixed') {
                         ths.forEach(t => {
                             t.style.width = t.getBoundingClientRect().width + 'px';
