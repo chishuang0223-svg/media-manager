@@ -319,12 +319,12 @@
             text-align: center;
         }
 
-        td:nth-child(5), td:nth-child(13) { /* 原创/供稿、主持人 */
+        td:nth-child(5), td:nth-child(14) { /* 原创/供稿、主持人 */
             width: 80px;
             text-align: center;
         }
 
-        td:nth-child(14) { /* 操作 */
+        td:nth-child(15) { /* 操作 */
             width: 120px;
             text-align: center;
         }
@@ -350,10 +350,20 @@
             word-wrap: break-word;
         }
 
-        td:nth-child(7) { /* 发布平台 */
-            width: 110px;
+        td:nth-child(6) { /* 发布平台 */
+            width: 70px;
+            min-width: 70px;
             white-space: normal;
             word-wrap: break-word;
+        }
+
+        td:nth-child(7) { /* 详细资源 */
+            width: 400px;
+            max-width: 400px;
+            white-space: normal;
+            word-wrap: break-word;
+            word-break: keep-all;
+            overflow: hidden;
         }
 
         td:nth-child(9) { /* 活动标签 */
@@ -372,16 +382,6 @@
         td:nth-child(11), td:nth-child(12) { /* 单次费用、剩余费用 */
             width: 110px;
             text-align: right;
-        }
-
-        /* 列宽优化 - 详细资源列（最宽，支持换行） */
-        td:nth-child(8) { /* 详细资源 */
-            width: 400px;
-            max-width: 400px;
-            white-space: normal;
-            word-wrap: break-word;
-            word-break: keep-all;
-            overflow: hidden;
         }
 
         /* 活动详情页面表格列宽优化 */
