@@ -1393,6 +1393,10 @@
                     </select>
                 </div>
                 <div class="form-group">
+                    <label>备注</label>
+                    <textarea id="resourceNotes" placeholder="备注信息（选填）" rows="3"></textarea>
+                </div>
+                <div class="form-group">
                     <label>下单日期</label>
                     <select id="orderDate">
                         <option value="2025年12月">2025年12月</option>
@@ -2365,6 +2369,7 @@
                 document.getElementById('singleCostInput').value = resource.singleCost;
                 document.getElementById('hasHost').value = resource.hasHost;
                 document.getElementById('orderDate').value = resource.orderDate || '2025年12月';
+                document.getElementById('resourceNotes').value = resource.notes || '';
                 document.getElementById('modal').style.display = 'block';
             }
         }
@@ -2416,6 +2421,7 @@
                 contentType: document.getElementById('contentType').value,
                 platform: document.getElementById('platform').value,
                 detail: document.getElementById('resourceDetail').value,
+                notes: document.getElementById('resourceNotes').value,
                 frequency: frequency,
                 singleCost: singleCost,
                 totalCost: singleCost * frequency,
