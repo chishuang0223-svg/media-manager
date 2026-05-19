@@ -231,25 +231,23 @@
         }
 
         .export-btn {
-            background: linear-gradient(135deg, #7cb342 0%, #558b2f 100%);
+            background: linear-gradient(135deg, #607d8b 0%, #455a64 100%);
         }
 
-        /* 标签汇总按钮特殊样式 - 超级醒目（静态） */
+        /* 标签汇总按钮 */
         .summary-btn {
-            background: linear-gradient(135deg, #ff6b35 0%, #f7931e 100%) !important;
-            font-size: 20px !important;
-            padding: 18px 45px !important;
-            box-shadow: 0 8px 30px rgba(255, 107, 53, 0.7);
-            font-weight: 900 !important;
-            position: relative;
-            margin-right: 20px !important;
-            letter-spacing: 3px;
-            text-transform: uppercase;
+            background: linear-gradient(135deg, #546e7a 0%, #37474f 100%) !important;
+            font-size: 14px !important;
+            padding: 12px 20px !important;
+            box-shadow: none;
+            font-weight: 600 !important;
+            letter-spacing: 0.5px;
+            margin-right: 0 !important;
         }
 
         .summary-btn:hover {
-            transform: translateY(-3px) !important;
-            box-shadow: 0 10px 35px rgba(255, 107, 53, 0.8);
+            transform: translateY(-2px) !important;
+            box-shadow: 0 4px 10px rgba(55, 71, 79, 0.3) !important;
         }
 
         .add-btn:hover, .export-btn:hover {
@@ -512,13 +510,13 @@
         }
 
         .badge-type {
-            background: #e3f2fd;
-            color: #1976d2;
+            background: #eceff1;
+            color: #546e7a;
         }
 
         .badge-platform {
-            background: #f3e5f5;
-            color: #7b1fa2;
+            background: #f5f5f5;
+            color: #616161;
         }
 
         .badge-content {
@@ -614,7 +612,7 @@
 
         .add-tag-btn {
             padding: 8px 20px;
-            background: linear-gradient(135deg, #ff6b35 0%, #f7931e 100%);
+            background: #546e7a;
             color: white;
             border: none;
             border-radius: 20px;
@@ -622,12 +620,12 @@
             font-size: 14px;
             font-weight: 600;
             transition: all 0.2s;
-            box-shadow: 0 2px 8px rgba(255, 107, 53, 0.3);
+            box-shadow: none;
         }
 
         .add-tag-btn:hover {
-            background: linear-gradient(135deg, #ff7b45 0%, #f9a02e 100%);
-            box-shadow: 0 4px 12px rgba(255, 107, 53, 0.4);
+            background: #607d8b;
+            box-shadow: none;
             transform: translateY(-1px);
         }
 
@@ -1076,7 +1074,7 @@
                 <button class="export-btn summary-btn" onclick="openTagSummaryPage()">📊 标签汇总</button>
                 <div style="flex: 1; min-width: 10px;"></div>
                 <div style="position: relative;">
-                    <button class="export-btn" onclick="toggleManageMenu(event)" style="background: linear-gradient(135deg, #78909c 0%, #546e7a 100%);">⚙️ 管理</button>
+                    <button class="export-btn" onclick="toggleManageMenu(event)">⚙️ 管理</button>
                     <div id="manageDropdown" onclick="event.stopPropagation()" style="display: none; position: absolute; top: calc(100% + 6px); right: 0; background: white; border: 1px solid #ddd; border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,0.15); padding: 6px; min-width: 148px; z-index: 1000;">
                         <div onclick="openAddModal(); document.getElementById('manageDropdown').style.display='none'" style="padding: 9px 14px; cursor: pointer; border-radius: 4px; font-size: 14px;" onmouseover="this.style.background='#f5f5f5'" onmouseout="this.style.background=''">+ 添加资源</div>
                         <div onclick="exportData(); document.getElementById('manageDropdown').style.display='none'" style="padding: 9px 14px; cursor: pointer; border-radius: 4px; font-size: 14px;" onmouseover="this.style.background='#f5f5f5'" onmouseout="this.style.background=''">💾 导出备份</div>
