@@ -1134,6 +1134,8 @@
                         <div onclick="exportData(); document.getElementById('manageDropdown').style.display='none'" style="padding: 9px 14px; cursor: pointer; border-radius: 4px; font-size: 14px;" onmouseover="this.style.background='#f5f5f5'" onmouseout="this.style.background=''">💾 导出备份</div>
                         <div onclick="document.getElementById('importFile').click(); document.getElementById('manageDropdown').style.display='none'" style="padding: 9px 14px; cursor: pointer; border-radius: 4px; font-size: 14px;" onmouseover="this.style.background='#f5f5f5'" onmouseout="this.style.background=''">📥 导入备份</div>
                         <div onclick="document.getElementById('batchImportFile').click(); document.getElementById('manageDropdown').style.display='none'" style="padding: 9px 14px; cursor: pointer; border-radius: 4px; font-size: 14px;" onmouseover="this.style.background='#f5f5f5'" onmouseout="this.style.background=''">📋 批量导入</div>
+                        <hr style="margin: 4px 0; border: none; border-top: 1px solid #eee;">
+                        <div onclick="viewOperationLog(); document.getElementById('manageDropdown').style.display='none'" style="padding: 9px 14px; cursor: pointer; border-radius: 4px; font-size: 14px;" onmouseover="this.style.background='#f5f5f5'" onmouseout="this.style.background=''">🕓 操作日志</div>
                     </div>
                 </div>
             </div>
@@ -2504,6 +2506,7 @@
             if (firebaseReady && resource.firestoreId) {
                 try {
                     await db.collection(COLLECTION_RESOURCES).doc(resource.firestoreId).delete();
+                    logOperation('delete', resource.mediaName, `平台:${resource.platform || ''}`);
                     showUndoToast(resource.mediaName);
                 } catch (error) {
                     console.error('❌ 云端删除失败:', error);
@@ -2516,6 +2519,7 @@
                 resources = resources.filter(r => r.id !== id);
                 saveToLocalStorage();
                 renderTable();
+                logOperation('delete', resource.mediaName, `平台:${resource.platform || ''}`);
                 showUndoToast(resource.mediaName);
             }
         }
@@ -2554,9 +2558,9 @@
                 const resource = resources.find(r => r.id === editingId);
                 if (resource) {
                     Object.assign(resource, formData);
-                    // 保留已使用频次和活动标签
                     if (!resource.usedFrequency) resource.usedFrequency = 0;
                     if (!resource.activityTags) resource.activityTags = [];
+                    logOperation('edit', formData.mediaName, `平台:${formData.platform || ''}`);
                 }
             } else {
                 // 添加新资源
@@ -2567,6 +2571,7 @@
                     activityTags: []
                 };
                 resources.push(newResource);
+                logOperation('add', formData.mediaName, `平台:${formData.platform || ''}`);
             }
 
             saveToStorage();
@@ -2732,6 +2737,66 @@
             }
 
             dropdown.innerHTML = html;
+        }
+
+        // ===== 操作日志 =====
+        const COLLECTION_LOGS = 'operationLogs';
+
+        async function logOperation(action, resourceName, detail) {
+            if (!firebaseReady) return;
+            try {
+                await db.collection(COLLECTION_LOGS).add({
+                    action,
+                    resourceName: resourceName || '',
+                    detail: detail || '',
+                    timestamp: Date.now()
+                });
+            } catch (e) {
+                console.warn('日志写入失败:', e);
+            }
+        }
+
+        async function viewOperationLog() {
+            const modal = document.getElementById('logModal');
+            const list  = document.getElementById('logList');
+            modal.style.display = 'flex';
+            list.innerHTML = '<div style="text-align:center;color:#aaa;padding:40px;">加载中...</div>';
+
+            if (!firebaseReady) {
+                list.innerHTML = '<div style="text-align:center;color:#aaa;padding:40px;">未连接云端，无法查看日志</div>';
+                return;
+            }
+            try {
+                const snap = await db.collection(COLLECTION_LOGS)
+                    .orderBy('timestamp', 'desc')
+                    .limit(200)
+                    .get();
+
+                if (snap.empty) {
+                    list.innerHTML = '<div style="text-align:center;color:#aaa;padding:40px;">暂无操作记录</div>';
+                    return;
+                }
+
+                const actionLabel = { add:'新增', edit:'编辑', delete:'删除', import:'导入', batchImport:'批量导入' };
+                const actionColor = { add:'#2e7d32', edit:'#1565c0', delete:'#c62828', import:'#6a1b9a', batchImport:'#6a1b9a' };
+
+                let html = '';
+                snap.forEach(doc => {
+                    const d = doc.data();
+                    const time = new Date(d.timestamp).toLocaleString('zh-CN', { hour12: false });
+                    const label = actionLabel[d.action] || d.action;
+                    const color = actionColor[d.action] || '#555';
+                    html += `<div style="padding:12px 24px; border-bottom:1px solid #f5f5f5; display:flex; align-items:baseline; gap:12px;">
+                        <span style="font-size:12px; color:#999; white-space:nowrap; min-width:140px;">${time}</span>
+                        <span style="font-size:12px; font-weight:700; color:${color}; min-width:32px;">${label}</span>
+                        <span style="font-size:14px; color:#333; font-weight:600;">${d.resourceName}</span>
+                        ${d.detail ? `<span style="font-size:12px; color:#888;">${d.detail}</span>` : ''}
+                    </div>`;
+                });
+                list.innerHTML = html;
+            } catch (e) {
+                list.innerHTML = `<div style="text-align:center;color:#e53935;padding:40px;">加载失败: ${e.message}</div>`;
+            }
         }
 
         function toggleManageMenu(event) {
@@ -3424,6 +3489,7 @@
                     await colorMapRef.set({ colors: tagColorMap }, { merge: true });
 
                     alert(`✅ 数据导入成功！\n\n已导入 ${backup.resources.length} 条资源\n其中 ${backup.resources.filter(r => r.activityTags && r.activityTags.length > 0).length} 条有标签`);
+                    logOperation('import', '备份文件', `导入 ${backup.resources.length} 条资源`);
                 } else {
                     // 仅恢复到本地
                     resources = backup.resources;
@@ -3579,6 +3645,7 @@
                     }
 
                     alert(`✅ 批量导入成功！\n\n${mode ? '已追加' : '已替换'} ${newResources.length} 条资源`);
+                    logOperation('batchImport', '批量导入', `${mode ? '追加' : '替换'} ${newResources.length} 条资源`);
                 } else {
                     saveToStorage();
                     renderTable();
@@ -3683,6 +3750,19 @@
         <span id="undoToastMsg"></span>
         <button class="undo-btn" onclick="undoDelete()">撤销</button>
         <div class="undo-progress" id="undoProgress"></div>
+    </div>
+
+    <!-- 操作日志弹窗 -->
+    <div id="logModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.45); z-index:10000; display:flex; align-items:center; justify-content:center;">
+        <div style="background:white; border-radius:12px; width:700px; max-width:95vw; max-height:80vh; display:flex; flex-direction:column; box-shadow:0 8px 32px rgba(0,0,0,0.2);">
+            <div style="padding:20px 24px 16px; border-bottom:1px solid #eee; display:flex; align-items:center; justify-content:space-between;">
+                <h3 style="margin:0; font-size:16px; color:#333;">🕓 操作日志</h3>
+                <button onclick="document.getElementById('logModal').style.display='none'" style="background:none; border:none; font-size:22px; cursor:pointer; color:#999; line-height:1;">&times;</button>
+            </div>
+            <div id="logList" style="overflow-y:auto; flex:1; padding:8px 0;">
+                <div style="text-align:center; color:#aaa; padding:40px;">加载中...</div>
+            </div>
+        </div>
     </div>
     <script>
         const notesTooltip = document.getElementById('notesTooltip');
