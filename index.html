@@ -721,6 +721,21 @@
             background: #da190b;
         }
 
+        .delete-tag-btn {
+            background: #f44336;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            padding: 6px 12px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: background 0.2s;
+        }
+
+        .delete-tag-btn:hover {
+            background: #da190b;
+        }
+
         .modal {
             display: none;
             position: fixed;
@@ -3306,6 +3321,7 @@
                     <td>
                         <button class="action-btn" onclick="editTagInfo('${item.tagName}')">编辑</button>
                         <button class="action-btn" onclick="viewActivityDetail('${item.tagName}')">查看详情</button>
+                        <button class="delete-tag-btn" onclick="deleteActivityTag('${item.tagName}')">删除</button>
                     </td>
                 `;
                 tbody.appendChild(row);
@@ -3323,6 +3339,77 @@
                 <td colspan="4"></td>
             `;
             tbody.appendChild(totalRow);
+        }
+
+        async function deleteActivityTag(tagName) {
+            const taggedResources = resources.filter(resource =>
+                Array.isArray(resource.activityTags) && resource.activityTags.includes(tagName)
+            );
+
+            if (!taggedResources.length) {
+                alert(`未找到使用标签“${tagName}”的资源。`);
+                return;
+            }
+
+            const confirmed = confirm(
+                `确定要彻底删除活动标签“${tagName}”吗？\n\n` +
+                `这会从 ${taggedResources.length} 条资源中移除该标签，并将每条资源的已使用频次减少 1 次。\n` +
+                '标签的传播方向、使用时间、汇报链接和备注也会一并删除。\n\n此操作无法撤销。'
+            );
+
+            if (!confirmed) {
+                return;
+            }
+
+            try {
+                if (firebaseReady) {
+                    const batchSize = 499;
+                    for (let index = 0; index < taggedResources.length; index += batchSize) {
+                        const batch = db.batch();
+                        const resourceBatch = taggedResources.slice(index, index + batchSize);
+
+                        resourceBatch.forEach(resource => {
+                            if (!resource.firestoreId) {
+                                throw new Error(`资源“${resource.mediaName}”缺少云端记录，无法删除标签。`);
+                            }
+
+                            batch.update(db.collection(COLLECTION_RESOURCES).doc(resource.firestoreId), {
+                                activityTags: resource.activityTags.filter(tag => tag !== tagName),
+                                usedFrequency: Math.max(0, (resource.usedFrequency || 0) - 1)
+                            });
+                        });
+
+                        await batch.commit();
+                    }
+                } else {
+                    taggedResources.forEach(resource => {
+                        resource.activityTags = resource.activityTags.filter(tag => tag !== tagName);
+                        resource.usedFrequency = Math.max(0, (resource.usedFrequency || 0) - 1);
+                    });
+                }
+
+                delete tagInfoMap[tagName];
+                delete tagColorMap[tagName];
+
+                if (firebaseReady) {
+                    await db.collection(COLLECTION_CONFIG).doc('tagInfoMap').set({ info: tagInfoMap }, { merge: true });
+                    await db.collection(COLLECTION_CONFIG).doc('tagColorMap').set({ colors: tagColorMap }, { merge: true });
+                } else {
+                    saveToLocalStorage();
+                }
+
+                if (currentSummaryTagNameFilter === tagName) {
+                    currentSummaryTagNameFilter = null;
+                }
+
+                renderTable();
+                updateStats();
+                renderTagSummary();
+                alert(`✅ 已彻底删除标签“${tagName}”，并同步更新 ${taggedResources.length} 条资源。`);
+            } catch (error) {
+                console.error('❌ 删除活动标签失败:', error);
+                alert(`删除标签失败：${error.message}`);
+            }
         }
 
         // 编辑标签信息
