@@ -444,7 +444,7 @@
         }
 
         #activityDetailTable td:nth-child(11) { /* 操作 */
-            width: 80px;
+            width: 100px;
             text-align: center;
         }
 
@@ -2317,7 +2317,7 @@
                     <td>${resource.detail}</td>
                     <td class="price">¥${parseFloat(resource.singleCost).toLocaleString()}</td>
                     <td>${resource.hasHost === 'Y' ? '✅' : '❌'}</td>
-                    <td><button class="action-btn delete-btn" onclick="deleteResourceFromActivityDetail(${resource.id})">删除</button></td>
+                    <td><button class="action-btn" onclick="cancelResourceUseFromActivity(${resource.id})">取消使用</button></td>
                 `;
                 detailBody.appendChild(row);
             });
@@ -2453,31 +2453,44 @@
             }
         }
 
-        // 从活动详情中彻底删除一条媒体资源
-        async function deleteResourceFromActivityDetail(id) {
+        // 取消当前活动对某条资源的一次使用，并将资源释放回资源池
+        async function cancelResourceUseFromActivity(id) {
             const resource = resources.find(item => item.id === id);
-            if (!resource) return;
+            if (!resource?.activityTags) return;
 
-            if (!confirm(`确定要彻底删除“${resource.mediaName}”吗？\n\n该资源会从整个媒体资源库及所有关联活动中删除。`)) {
+            const tagIndex = resource.activityTags.indexOf(currentActivityName);
+            if (tagIndex === -1) return;
+
+            if (!confirm(
+                `确定取消“${resource.mediaName}”在“${currentActivityName}”中的使用吗？\n\n` +
+                '资源会保留在总资源池中，剩余使用频次和剩余费用将恢复 1 次；其他活动中的使用记录不受影响。'
+            )) {
                 return;
             }
 
-            await deleteResource(id);
-            resources = resources.filter(item => item.id !== id);
-            renderTable();
-            updateStats();
+            resource.activityTags.splice(tagIndex, 1);
+            resource.usedFrequency = Math.max(0, (resource.usedFrequency || 0) - 1);
 
-            const remainingResources = resources.filter(item =>
-                item.activityTags && item.activityTags.includes(currentActivityName)
-            );
+            try {
+                await saveOneToStorage(resource);
+                renderTable();
+                updateStats();
 
-            if (remainingResources.length === 0) {
-                alert(`“${currentActivityName}”已没有关联资源，已返回活动标签汇总。`);
-                openTagSummaryPage();
-                return;
+                const remainingResources = resources.filter(item =>
+                    item.activityTags && item.activityTags.includes(currentActivityName)
+                );
+
+                if (remainingResources.length === 0) {
+                    alert(`已取消使用；“${currentActivityName}”已没有关联资源，已返回活动标签汇总。`);
+                    openTagSummaryPage();
+                    return;
+                }
+
+                viewActivityDetail(currentActivityName);
+            } catch (error) {
+                console.error('❌ 取消资源使用失败:', error);
+                alert(`取消使用失败：${error.message}`);
             }
-
-            viewActivityDetail(currentActivityName);
         }
 
         // 删除资源
