@@ -1,0 +1,22 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function hasMediaManagerAccess() {
+      return request.auth != null
+        && request.auth.token.mediaManagerAccess == true;
+    }
+
+    match /mediaResources/{document=**} {
+      allow read, write: if hasMediaManagerAccess();
+    }
+
+    match /config/{document=**} {
+      allow read, write: if hasMediaManagerAccess();
+    }
+
+    match /operationLogs/{document=**} {
+      allow read, write: if hasMediaManagerAccess();
+    }
+  }
+}

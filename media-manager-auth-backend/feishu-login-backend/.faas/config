@@ -1,0 +1,8 @@
+version: v1alpha1
+functions:
+    - fdId: lfc-h2io5cym
+      name: feishu-login-backend
+      application: media-manager-auth
+      tenant: vqvtdd
+      spec:
+        runtime: native-node.js.20.x

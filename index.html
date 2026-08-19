@@ -10,6 +10,7 @@
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
 
     <style>
         * {
@@ -444,7 +445,7 @@
         }
 
         #activityDetailTable td:nth-child(11) { /* 操作 */
-            width: 80px;
+            width: 100px;
             text-align: center;
         }
 
@@ -1556,65 +1557,45 @@
         const COLLECTION_RESOURCES = 'mediaResources';
         const COLLECTION_CONFIG = 'config';
 
-        // 新飞书企业自建应用的公开 App ID。静态页面不保存 App Secret。
-        const FEISHU_APP_ID = 'cli_aae697ecebf8dbb3';
-        const FEISHU_REDIRECT_URI = 'https://chishuang0223-svg.github.io/media-manager/';
-        const FEISHU_OAUTH_STATE_KEY = 'feishuOAuthState';
+        // 飞书登录改由后端负责（融合云 FaaS 上的 feishu-login-backend），
+        // 前端不再直接持有/校验授权码，只负责跳转和接收登录后的 Firebase 自定义令牌。
+        const FEISHU_LOGIN_BACKEND_URL = 'https://lfc-h2io5cym.cnhb01-dev.fc.chj.cloud';
 
-        function createOAuthState() {
-            const bytes = new Uint8Array(32);
-            crypto.getRandomValues(bytes);
-            return Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
+        function feishuLogin() {
+            window.location.assign(`${FEISHU_LOGIN_BACKEND_URL}/startFeishuLogin`);
         }
 
-        function handleFeishuCallback(code, state) {
-            const expectedState = sessionStorage.getItem(FEISHU_OAUTH_STATE_KEY);
-            sessionStorage.removeItem(FEISHU_OAUTH_STATE_KEY);
-
-            if (!expectedState || state !== expectedState) {
-                alert('飞书授权校验失败或已过期，请重新点击“飞书登录”。');
-                window.history.replaceState({}, document.title, window.location.pathname);
-                return;
-            }
-
-            sessionStorage.setItem('isLoggedIn', 'true');
-            sessionStorage.setItem('feishuLogin', 'true');
-            window.history.replaceState({}, document.title, window.location.pathname);
+        function completeSignIn() {
             showMainContent();
         }
 
-        function feishuLogin() {
-            const state = createOAuthState();
-            sessionStorage.setItem(FEISHU_OAUTH_STATE_KEY, state);
-
-            const authUrl = new URL('https://open.feishu.cn/open-apis/authen/v1/authorize');
-            authUrl.search = new URLSearchParams({
-                app_id: FEISHU_APP_ID,
-                redirect_uri: FEISHU_REDIRECT_URI,
-                response_type: 'code',
-                scope: 'contact:user.base:readonly',
-                state
-            }).toString();
-
-            window.location.assign(authUrl.toString());
+        function showLoginPrompt() {
+            document.getElementById('feishuLoginBtn')?.addEventListener('click', feishuLogin);
         }
 
         document.addEventListener('DOMContentLoaded', function() {
-            const urlParams = new URLSearchParams(window.location.search);
-            const code = urlParams.get('code');
-            const state = urlParams.get('state');
+            const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+            const firebaseCustomToken = hashParams.get('firebaseCustomToken');
 
-            if (code || state) {
-                handleFeishuCallback(code, state);
+            if (firebaseCustomToken) {
+                window.history.replaceState({}, document.title, window.location.pathname);
+                firebase.auth().signInWithCustomToken(firebaseCustomToken)
+                    .then(completeSignIn)
+                    .catch(error => {
+                        console.error('❌ 登录令牌验证失败:', error);
+                        alert('登录验证失败，请重新点击“飞书登录”。');
+                        showLoginPrompt();
+                    });
                 return;
             }
 
-            if (sessionStorage.getItem('isLoggedIn') === 'true') {
-                showMainContent();
-                return;
-            }
-
-            document.getElementById('feishuLoginBtn')?.addEventListener('click', feishuLogin);
+            firebase.auth().onAuthStateChanged(user => {
+                if (user) {
+                    completeSignIn();
+                } else {
+                    showLoginPrompt();
+                }
+            });
         });
 
         // 显示主内容
@@ -2317,7 +2298,7 @@
                     <td>${resource.detail}</td>
                     <td class="price">¥${parseFloat(resource.singleCost).toLocaleString()}</td>
                     <td>${resource.hasHost === 'Y' ? '✅' : '❌'}</td>
-                    <td><button class="action-btn delete-btn" onclick="deleteResourceFromActivityDetail(${resource.id})">删除</button></td>
+                    <td><button class="action-btn" onclick="cancelResourceUseFromActivity(${resource.id})">取消使用</button></td>
                 `;
                 detailBody.appendChild(row);
             });
@@ -2453,31 +2434,44 @@
             }
         }
 
-        // 从活动详情中彻底删除一条媒体资源
-        async function deleteResourceFromActivityDetail(id) {
+        // 取消当前活动对某条资源的一次使用，并将资源释放回资源池
+        async function cancelResourceUseFromActivity(id) {
             const resource = resources.find(item => item.id === id);
-            if (!resource) return;
+            if (!resource?.activityTags) return;
 
-            if (!confirm(`确定要彻底删除“${resource.mediaName}”吗？\n\n该资源会从整个媒体资源库及所有关联活动中删除。`)) {
+            const tagIndex = resource.activityTags.indexOf(currentActivityName);
+            if (tagIndex === -1) return;
+
+            if (!confirm(
+                `确定取消“${resource.mediaName}”在“${currentActivityName}”中的使用吗？\n\n` +
+                '资源会保留在总资源池中，剩余使用频次和剩余费用将恢复 1 次；其他活动中的使用记录不受影响。'
+            )) {
                 return;
             }
 
-            await deleteResource(id);
-            resources = resources.filter(item => item.id !== id);
-            renderTable();
-            updateStats();
+            resource.activityTags.splice(tagIndex, 1);
+            resource.usedFrequency = Math.max(0, (resource.usedFrequency || 0) - 1);
 
-            const remainingResources = resources.filter(item =>
-                item.activityTags && item.activityTags.includes(currentActivityName)
-            );
+            try {
+                await saveOneToStorage(resource);
+                renderTable();
+                updateStats();
 
-            if (remainingResources.length === 0) {
-                alert(`“${currentActivityName}”已没有关联资源，已返回活动标签汇总。`);
-                openTagSummaryPage();
-                return;
+                const remainingResources = resources.filter(item =>
+                    item.activityTags && item.activityTags.includes(currentActivityName)
+                );
+
+                if (remainingResources.length === 0) {
+                    alert(`已取消使用；“${currentActivityName}”已没有关联资源，已返回活动标签汇总。`);
+                    openTagSummaryPage();
+                    return;
+                }
+
+                viewActivityDetail(currentActivityName);
+            } catch (error) {
+                console.error('❌ 取消资源使用失败:', error);
+                alert(`取消使用失败：${error.message}`);
             }
-
-            viewActivityDetail(currentActivityName);
         }
 
         // 删除资源

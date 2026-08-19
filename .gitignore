@@ -30,3 +30,15 @@ convert_to_excel.py
 无标签.html
 无密码无云端.html
 无云端2.html
+
+# Firebase 本地文件与机密
+.firebase/
+firestore-debug.log
+ui-debug.log
+functions/node_modules/
+media-manager-auth-backend/**/node_modules/
+functions/.env
+functions/.env.*
+!functions/.env.example
+*.service-account.json
+service-account.json
